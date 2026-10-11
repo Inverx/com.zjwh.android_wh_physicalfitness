@@ -5,3 +5,6 @@ venv/
 *.egg-info/
 .pytest_cache/
 credentials.json
+
+# 含真实记录数据的对比图，不入库
+experiments/record_compare.png

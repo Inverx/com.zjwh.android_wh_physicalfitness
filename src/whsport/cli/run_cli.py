@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import random
 import sys
 import time
 
@@ -27,6 +28,8 @@ def main():
     parser.add_argument("-d", "--distance", type=float, help="跑步距离，单位米")
     parser.add_argument("--time", type=int, help="跑步用时，单位秒")
     parser.add_argument("--steps", type=int, help="跑步步数")
+    parser.add_argument("--jitter", action=argparse.BooleanOptionalAction, default=True,
+                        help="对距离/用时/步数做小幅随机扰动（默认开启，用 --no-jitter 关闭）")
     parser.add_argument("--weight", type=float, default=DEFAULT_BODY_WEIGHT_KG,
                         help=f"体重（公斤），用于估算卡路里与功率（默认 {DEFAULT_BODY_WEIGHT_KG:g}）")
     parser.add_argument("--latitude", "--lat", dest="latitude", type=float,
@@ -135,6 +138,14 @@ def main():
         print(f"错误: {exc}")
         return
     latitude, longitude = coordinate
+
+    if args.jitter:
+        # Real runs land ~2002-2045 m with 100 m+ overshoot being normal; keep the
+        # extra under ~200 m and let time/steps drift a little more than before.
+        jr = random.Random()
+        distance = float(int(round(distance * jr.uniform(1.005, 1.095))))
+        duration = int(round(duration * jr.uniform(0.96, 1.07)))
+        steps = int(round(steps * jr.uniform(0.96, 1.07)))
 
     if distance <= 0 or duration <= 0 or steps < 0:
         print("错误: 距离和用时必须为正数，步数不能为负数")
