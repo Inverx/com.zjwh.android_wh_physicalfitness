@@ -67,6 +67,19 @@ def estimate_stride_cm(total_distance_m: float, total_steps: int) -> float:
     return round(total_distance_m / total_steps * 100.0, 1)
 
 
+def _smooth_series(values: List[float], window: int = 5) -> List[float]:
+    """Light moving average (device-like filtering for derived metrics)."""
+    n = len(values)
+    if n == 0 or window <= 1:
+        return list(values)
+    half = window // 2
+    out = []
+    for i in range(n):
+        a, b = max(0, i - half), min(n, i + half + 1)
+        out.append(sum(values[a:b]) / (b - a))
+    return out
+
+
 def elevation_gain(elevations) -> float:
     """Cumulative climb, ignoring sub-ELE_NOISE_M jitter (official口径)."""
     gain = 0.0
@@ -540,7 +553,8 @@ def _speed_profile(n: int, base_speed: float, duration_s: float,
         fade = 1.0 - fatigue * (ti ** power)
         recovery = 1.0 + sum(a * math.exp(-((ti - mu) / s) ** 2) for mu, s, a in bumps)
         osc = 1.0 + sum(a * math.sin(2 * math.pi * f * ti + ph) for f, ph, a in oscillations)
-        v = base_speed * warm * fade * recovery * osc * (1.0 + ar[i])
+        # small independent micro-jitter so consecutive samples differ
+        v = base_speed * warm * fade * recovery * osc * (1.0 + ar[i] + rng.gauss(0.0, 0.004))
         speeds.append(min(hi, max(lo, v)))
 
     # 4) occasional short slowdowns (crossing, phone, etc.)
@@ -567,9 +581,15 @@ def _sample_deltas(n: int, total_s: float, rng: random.Random) -> List[float]:
     if total_s <= m * 2.5:
         return [total_s / m] * m
     dt = total_s / m
-    deltas = [dt if rng.random() < 0.80
-              else float(rng.choice((1.0, 2.0, 3.0, 4.0, 6.0, 7.0, 8.0)))
-              for _ in range(m)]
+    deltas = []
+    for _ in range(m):
+        r = rng.random()
+        if r < 0.70:
+            deltas.append(dt)
+        elif r < 0.90:
+            deltas.append(dt * rng.uniform(0.85, 1.15))   # near-nominal jitter
+        else:
+            deltas.append(dt * rng.uniform(1.30, 1.90))   # lost fix / longer gap
     loose = [i for i, s in enumerate(deltas) if s != dt]
     delta = total_s - sum(deltas)
     if loose and abs(delta) > 1e-9:
@@ -665,6 +685,12 @@ def _ten_sec_windows(points: List[GpsPoint], start_ms: int, total_time: int,
                 w["distance"] = w["distance"] * k
     for w in speed_windows:
         w["distance"] = round(w["distance"], 4)
+
+    # Realistic pedometer counting noise, deterministic per (start_ms, window) so
+    # the record body and the OBS object stay identical.
+    for k in range(len(raw_steps)):
+        hv = int.from_bytes(hashlib.md5(f"{start_ms}:{k}".encode()).digest()[:3], "big")
+        raw_steps[k] = max(0.0, raw_steps[k] + (hv / 0xFFFFFF - 0.5) * 2.6)
 
     if total_steps is not None and raw_steps and sum(raw_steps) > 0:
         counts = _largest_remainder(int(total_steps), raw_steps)
@@ -838,11 +864,13 @@ def order_points_loop(points_ll: List[Tuple[float, float]]) -> List[Tuple[float,
 
 
 def _build_loop_through_points(control_ll, n_per_seg: int = 60):
-    """Closed Catmull-Rom loop passing exactly through the given control points.
+    """Closed polygon through the control points with rounded corners.
 
-    control_ll: list of (lat, lon) in WGS-84, in visit order.  The returned path
-    is rotated so it starts at the point farthest from any control point, so the
-    run's start pin does not sit on top of a check-in marker.
+    control_ll: list of (lat, lon) in WGS-84, in visit order.  Straight edges
+    plus a small quadratic fillet at each vertex mimic running along campus
+    roads (long straights + turns) far better than a Catmull-Rom spline, whose
+    near-constant curvature is itself a fingerprint.  The ring is rotated so it
+    starts at the point farthest from any control point.
     """
     n = len(control_ll)
     lat0 = sum(p[0] for p in control_ll) / n
@@ -852,20 +880,37 @@ def _build_loop_through_points(control_ll, n_per_seg: int = 60):
     m_lon = 111320.0 * kx
     xy = [((lon - lon0) * m_lon, (lat - lat0) * m_lat) for lat, lon in control_ll]
 
+    def _unit(a, b):
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        length = math.hypot(dx, dy) or 1.0
+        return (dx / length, dy / length), length
+
+    # entry/exit points of the rounded corner at each vertex
+    entry = []
+    exit_ = []
+    for i in range(n):
+        prev, cur, nxt = xy[(i - 1) % n], xy[i], xy[(i + 1) % n]
+        u_in, len_prev = _unit(cur, prev)
+        u_out, len_next = _unit(cur, nxt)
+        r = min(len_prev, len_next) * 0.15
+        entry.append((cur[0] + u_in[0] * r, cur[1] + u_in[1] * r))
+        exit_.append((cur[0] + u_out[0] * r, cur[1] + u_out[1] * r))
+
     dense = []
     for i in range(n):
-        p0, p1 = xy[(i - 1) % n], xy[i]
-        p2, p3 = xy[(i + 1) % n], xy[(i + 2) % n]
-        for j in range(n_per_seg):
+        a = exit_[i]                 # leave vertex i
+        b = entry[(i + 1) % n]       # arrive at vertex i+1
+        for j in range(n_per_seg):   # straight edge
             t = j / n_per_seg
-            t2, t3 = t * t, t * t * t
-            x = 0.5 * ((2 * p1[0]) + (-p0[0] + p2[0]) * t
-                       + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2
-                       + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3)
-            y = 0.5 * ((2 * p1[1]) + (-p0[1] + p2[1]) * t
-                       + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2
-                       + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3)
-            dense.append((x, y))
+            dense.append((a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t))
+        v = xy[(i + 1) % n]          # rounded corner (quadratic Bezier)
+        p0, p2 = entry[(i + 1) % n], exit_[(i + 1) % n]
+        steps = max(2, n_per_seg // 4)
+        for j in range(steps):
+            t = j / steps
+            mt = 1.0 - t
+            dense.append((mt * mt * p0[0] + 2 * mt * t * v[0] + t * t * p2[0],
+                          mt * mt * p0[1] + 2 * mt * t * v[1] + t * t * p2[1]))
     body = [(lat0 + y / m_lat, lon0 + x / m_lon) for x, y in dense]
 
     # Rotate the ring so it starts at the point farthest from every control point.
@@ -932,17 +977,18 @@ def generate_synthetic_gps_track(start_lat: float, start_lon: float,
 
     # 2) elevation profile (a function of distance) and its slope
     e_base = rng.uniform(15.0, 130.0)
-    a1, a2 = rng.uniform(2.0, 5.0), rng.uniform(0.5, 1.2)
-    p1, p2 = rng.uniform(0.0, 2 * math.pi), rng.uniform(0.0, 2 * math.pi)
-    w1, w2 = rng.uniform(1000.0, 2500.0), rng.uniform(350.0, 700.0)
+    # 4-6 terrain components so the altitude power spectrum is broadband
+    # instead of two clean spikes.
+    terrain_terms = [(rng.uniform(0.3, 2.4), rng.uniform(220.0, 2600.0),
+                      rng.uniform(0.0, 2 * math.pi)) for _ in range(rng.randint(4, 6))]
 
     def _elev(d: float) -> float:
-        return (e_base + a1 * math.sin(2 * math.pi * d / w1 + p1)
-                + a2 * math.sin(2 * math.pi * d / w2 + p2))
+        return e_base + sum(a * math.sin(2 * math.pi * d / w + p)
+                            for a, w, p in terrain_terms)
 
     def _grade(d: float) -> float:
-        return (a1 * (2 * math.pi / w1) * math.cos(2 * math.pi * d / w1 + p1)
-                + a2 * (2 * math.pi / w2) * math.cos(2 * math.pi * d / w2 + p2))
+        return sum(a * (2 * math.pi / w) * math.cos(2 * math.pi * d / w + p)
+                   for a, w, p in terrain_terms)
 
     # 3) terrain coupling: uphill slows, downhill only slightly speeds up
     k_up, k_down = rng.uniform(1.2, 2.2), rng.uniform(0.6, 1.2)
@@ -986,6 +1032,16 @@ def generate_synthetic_gps_track(start_lat: float, start_lon: float,
 
     drift = 1.5 / 111320.0
     cos_lat = math.cos(math.radians(start_lat))
+    # Autocorrelated (colored) GPS drift — real receiver error is not white noise.
+    rho_g = rng.uniform(0.55, 0.85)
+    gps_n = gps_e = 0.0
+    # Colored barometric altitude noise (kept in the OBS; ascent uses a smoothed copy).
+    rho_e = rng.uniform(0.75, 0.92)
+    sigma_e = rng.uniform(0.45, 0.80)
+    ele_noise = [0.0] * n
+    for i in range(1, n):
+        ele_noise[i] = (ele_noise[i - 1] * rho_e
+                        + sigma_e * math.sqrt(1 - rho_e * rho_e) * rng.gauss(0.0, 1.0))
     points = []
     elapsed_ms = 0.0
     for i in range(n):
@@ -994,26 +1050,23 @@ def generate_synthetic_gps_track(start_lat: float, start_lon: float,
         pt_time = int(round(start_time_ms + elapsed_ms))
         lat, lon = _point_at_distance(path, path_cum, cum[i])
         if i > 0:
-            lat += rng.gauss(0.0, drift)
-            lon += rng.gauss(0.0, drift / cos_lat)
-        ele = _elev(cum[i]) + rng.gauss(0.0, 0.20)
+            gps_n = gps_n * rho_g + drift * math.sqrt(1 - rho_g * rho_g) * rng.gauss(0.0, 1.0)
+            gps_e = gps_e * rho_g + drift * math.sqrt(1 - rho_g * rho_g) * rng.gauss(0.0, 1.0)
+            lat += gps_n
+            lon += gps_e / cos_lat
+        ele = _elev(cum[i]) + ele_noise[i]
         cad = cadence[i]
         stride = (speeds[i] / (cad / 60.0) * 100.0) if cad > 0 else 0.0
         stride = max(height_cm * 0.42, min(height_cm * 1.15, stride))
         acc = min(25.0, max(1.5, rng.gauss(5.0, 2.0)))
         points.append(GpsPoint(round(lat, 6), round(lon, 6), pt_time,
-                               round(speeds[i], 2), accuracy=round(acc, 1),
+                               round(speeds[i], 3), accuracy=round(acc, 1),
                                ele=round(ele, 2), cadence=round(cad, 1),
                                stride_cm=round(stride, 1), cum_dist=round(cum[i], 3),
                                cum_steps=round(steps_cum[i], 2), index=i))
 
-    # Devices report barometer-filtered altitude, not the raw per-fix value;
-    # smoothing keeps totalAscent from being inflated by GPS noise.
-    if len(points) >= 5:
-        raw_ele = [p.ele for p in points]
-        for i in range(len(points)):
-            a, b = max(0, i - 2), min(len(points), i + 3)
-            points[i].ele = round(sum(raw_ele[a:b]) / (b - a), 2)
+    # The OBS keeps the (noisier) per-fix altitude; totalAscent is computed from
+    # a device-like smoothed copy in build_record.
 
     # Five fixed checkpoints; the first doubles as the run anchor.
     five_points = []
@@ -1261,9 +1314,11 @@ class OutdoorRunRecordBuilder:
                      if total_distance_m > 0 and total_time_sec > 0 else 0)
 
         if total_ascent is None:
-            total_ascent = (int(round(elevation_gain([p.ele for p in gps_points])))
-                            if any(p.ele for p in gps_points)
-                            else estimate_total_ascent(total_distance_m, rng))
+            if any(p.ele for p in gps_points):
+                eles = _smooth_series([p.ele for p in gps_points], 5)
+                total_ascent = int(round(elevation_gain(eles)))
+            else:
+                total_ascent = estimate_total_ascent(total_distance_m, rng)
         if calorie is None:
             calorie = estimate_calorie(total_distance_m, total_time_sec, weight_kg)
         if avg_power is None:
