@@ -600,8 +600,9 @@ class SportClient:
                 data = {}
         data = data or {}
         rule = data.get("runRuleModel") or {}
-        # Record-side policy for a score run is 0 so the app draws the check-ins.
-        policy = 0 if run_mode == 1 else int(data.get("policy") or 1)
+        # Record-side policy now mirrors the server value (1 for score runs on
+        # this account) instead of forcing 0.
+        policy = int(data.get("policy") or 1)
         policy_ts = int(data.get("timestamp") or 0)
         min_distance = int(rule.get("minDistance") or 0)
         face_check = 1 if rule.get("faceVerify") else 0
