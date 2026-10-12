@@ -39,6 +39,8 @@ def main():
     parser.add_argument("--dry-run", action="store_true",
                         help="只生成并校验记录，不上传到服务器")
     parser.add_argument("--type", type=int, default=1, choices=[1, 4], help="类型：1 计分跑，4 自由跑（默认 1）")
+    parser.add_argument("--policy", action=argparse.BooleanOptionalAction, default=True,
+                        help="提交体 policy：默认 1（对齐本账号历史）；--no-policy 则用 0")
     parser.add_argument("--proxy", help="代理地址")
     args = parser.parse_args()
 
@@ -176,7 +178,7 @@ def main():
             sel_distance_m=int(round(distance)), sel_run_time_s=duration,
         ).build_record(
             int(round(distance)), duration, steps, start_time_ms, stop_time_ms,
-            points, fixed_points, weight_kg=args.weight,
+            points, fixed_points, weight_kg=args.weight, policy=int(args.policy),
         )
 
         # Fields the app renders (消耗 / 爬升 / 平均功率 / 步频 / 步幅).
@@ -204,6 +206,7 @@ def main():
             start_lat=latitude,
             start_lon=longitude,
             weight_kg=args.weight,
+            policy=int(args.policy),
         )
 
     if res.get("error") == 10000 or res.get("code") == 0:

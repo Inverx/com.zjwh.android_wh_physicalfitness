@@ -637,6 +637,7 @@ class SportClient:
                        start_lat: Optional[float] = None,    # 起点纬度
                        start_lon: Optional[float] = None,    # 起点经度
                        weight_kg: float = DEFAULT_BODY_WEIGHT_KG,  # 体重，用于估算卡路里/功率
+                       policy: Optional[int] = None,   # 覆盖提交体 policy（默认用服务端值）
                        dry_run: bool = False) -> dict:
 
         if start_lat is None or start_lon is None:
@@ -662,7 +663,9 @@ class SportClient:
         # Fetch policy (runes header + selDistance/faceCheck) and, for a score
         # run, the server-issued check-in points that the track must pass.
         run_mode = 1 if sport_type == 1 else 2
-        policy, policy_ts, min_distance, face_check = self._run_policy(run_mode)
+        policy_value, policy_ts, min_distance, face_check = self._run_policy(run_mode)
+        if policy is not None:
+            policy_value = int(policy)
 
         control_points = None
         five_points = None
@@ -721,7 +724,7 @@ class SportClient:
             gps_points=gps_points,
             five_points=five_points,
             weight_kg=weight_kg,
-            policy=policy,
+            policy=policy_value,
             sel_distance=(min_distance or None),
             sel_run_time=total_time_sec,
             face_check=face_check,
