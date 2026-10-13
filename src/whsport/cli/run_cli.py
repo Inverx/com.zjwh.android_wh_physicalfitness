@@ -1,10 +1,7 @@
 import argparse
 import json
-import os
 import random
-import sys
 import time
-
 
 from whsport.coordinate_utils import validate_coordinate
 from whsport.security_utils import redact_data

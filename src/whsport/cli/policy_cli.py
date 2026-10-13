@@ -1,8 +1,5 @@
 import argparse
 import json
-import os
-import sys
-
 
 from whsport.sport_client import SportClient
 

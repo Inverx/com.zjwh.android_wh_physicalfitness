@@ -1,9 +1,6 @@
 import argparse
 import datetime
 import json
-import os
-import sys
-
 
 from whsport.sport_client import SportClient
 

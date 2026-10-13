@@ -1,8 +1,5 @@
 import argparse
 import json
-import os
-import sys
-
 
 from whsport.sport_client import SportClient
 
@@ -56,7 +53,13 @@ def main():
     client = SportClient(uid=uid, token=token, unid=int(args.unid or 0), proxy=args.proxy)
 
     print("正在查询学期成绩...")
-    res_completed = client.get_semester_completed()
+    # The completed-distance API needs the current semester id (sid); passing 0
+    # returns all zeros.
+    sid = 0
+    info = client.get_semester_info(1)
+    if info.get("error") == 10000 and isinstance(info.get("data"), dict):
+        sid = int(info["data"].get("sid") or 0)
+    res_completed = client.get_semester_completed(sid=sid)
     res_config = client.get_history_config()
 
     if res_completed.get("error") == 10000:

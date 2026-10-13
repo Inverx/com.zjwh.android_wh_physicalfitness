@@ -1,9 +1,6 @@
 import argparse
 import json
-import os
-import sys
 import time
-
 
 from whsport.sport_client import SportClient
 from whsport.security_utils import mask_secret, redact_data
