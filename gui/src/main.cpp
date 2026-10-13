@@ -156,6 +156,20 @@ void doQuery(const std::string& cmd) {
     });
 }
 
+// 标签 + 输入框。EUI-NEO 的占位符在有值时不可见，所以显式带一个标签。
+void field(eui::Ui& ui, const std::string& id, const std::string& label,
+           const std::string& value, float width,
+           std::function<void(const std::string&)> on_change) {
+    ui.column(id).gap(4.0f).content([&] {
+        ui.text(id + ".label").text(label).fontSize(13.0f).opacity(0.65f).build();
+        components::input(ui, id + ".input")
+            .value(value)
+            .size(width, 40.0f)
+            .onChange(std::move(on_change))
+            .build();
+    }).build();
+}
+
 }  // namespace
 
 const DslAppConfig& dslAppConfig() {
@@ -192,28 +206,28 @@ void compose(eui::Ui& ui, const eui::Screen& screen) {
                 .build();
 
             if (s.tab == 0) {
-                components::input(ui, "user").value(s.user).placeholder("账号")
-                    .onChange([](const std::string& v) { st().user = v; }).build();
-                components::input(ui, "pass").value(s.pass).placeholder("密码")
-                    .onChange([](const std::string& v) { st().pass = v; }).build();
+                field(ui, "user", "账号", s.user, 320.0f,
+                      [](const std::string& v) { st().user = v; });
+                field(ui, "pass", "密码", s.pass, 320.0f,
+                      [](const std::string& v) { st().pass = v; });
                 components::button(ui, "login").text("登录并保存")
                     .disabled(s.busy).onClick(doLogin).build();
             } else if (s.tab == 1) {
-                ui.row("params").gap(10.0f).content([&] {
-                    components::input(ui, "dist").value(s.dist).placeholder("距离(米)")
-                        .onChange([](const std::string& v) { st().dist = v; }).build();
-                    components::input(ui, "time").value(s.time).placeholder("用时(秒)")
-                        .onChange([](const std::string& v) { st().time = v; }).build();
-                    components::input(ui, "steps").value(s.steps).placeholder("步数")
-                        .onChange([](const std::string& v) { st().steps = v; }).build();
-                    components::input(ui, "weight").value(s.weight).placeholder("体重")
-                        .onChange([](const std::string& v) { st().weight = v; }).build();
+                ui.row("params").gap(12.0f).content([&] {
+                    field(ui, "dist", "距离(米)", s.dist, 165.0f,
+                          [](const std::string& v) { st().dist = v; });
+                    field(ui, "time", "用时(秒)", s.time, 165.0f,
+                          [](const std::string& v) { st().time = v; });
+                    field(ui, "steps", "步数", s.steps, 165.0f,
+                          [](const std::string& v) { st().steps = v; });
+                    field(ui, "weight", "体重(kg)", s.weight, 165.0f,
+                          [](const std::string& v) { st().weight = v; });
                 }).build();
-                ui.row("geo").gap(10.0f).content([&] {
-                    components::input(ui, "lat").value(s.lat).placeholder("纬度")
-                        .onChange([](const std::string& v) { st().lat = v; }).build();
-                    components::input(ui, "lon").value(s.lon).placeholder("经度")
-                        .onChange([](const std::string& v) { st().lon = v; }).build();
+                ui.row("geo").gap(12.0f).content([&] {
+                    field(ui, "lat", "纬度", s.lat, 240.0f,
+                          [](const std::string& v) { st().lat = v; });
+                    field(ui, "lon", "经度", s.lon, 240.0f,
+                          [](const std::string& v) { st().lon = v; });
                 }).build();
                 ui.row("opts").gap(12.0f).content([&] {
                     components::checkbox(ui, "jitter").text("小幅随机")

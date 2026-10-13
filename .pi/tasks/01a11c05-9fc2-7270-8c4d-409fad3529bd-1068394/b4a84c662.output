@@ -10,3 +10,73 @@
 -- Configuring done (0.7s)
 -- Generating done (0.0s)
 -- Build files have been written to: /home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui/build
+   Compiling piper v0.2.5
+   Compiling once_cell v1.21.4
+   Compiling static_assertions v1.1.0
+   Compiling endi v1.1.1
+   Compiling thiserror v1.0.69
+   Compiling async-lock v3.4.2
+   Compiling memchr v2.8.3
+   Compiling concurrent-queue v2.5.0
+   Compiling tracing-core v0.1.36
+   Compiling futures-sink v0.3.34
+   Compiling bytes v1.12.1
+   Compiling futures-task v0.3.34
+   Compiling cpufeatures v0.2.17
+   Compiling async-broadcast v0.7.2
+   Compiling async-channel v2.5.0
+   Compiling ordered-stream v0.2.0
+   Compiling log v0.4.34
+   Compiling hex v0.4.3
+   Compiling blocking v1.7.0
+   Compiling syn v2.0.119
+   Compiling syn v3.0.5
+   Compiling async-executor v1.14.0
+   Compiling toml_parser v1.1.3+spec-1.1.0
+   Compiling futures-util v0.3.34
+   Compiling async-fs v2.2.0
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling digest v0.10.7
+   Compiling toml_edit v0.25.15+spec-1.1.0
+   Compiling sha1 v0.10.7
+   Compiling getrandom v0.2.17
+   Compiling errno v0.3.14
+   Compiling socket2 v0.6.5
+   Compiling mio v1.2.3
+   Compiling xdg-home v1.3.0
+   Compiling signal-hook-registry v1.4.8
+   Compiling proc-macro-crate v3.5.0
+   Compiling rand_core v0.6.4
+   Compiling parking_lot v0.12.5
+   Compiling ppv-lite86 v0.2.21
+   Compiling serde_derive v1.0.229
+   Compiling async-trait v0.1.92
+   Compiling tokio-macros v2.7.2
+   Compiling serde_repr v0.1.21
+   Compiling rand_chacha v0.3.1
+   Compiling rand v0.8.8
+   Compiling tokio v1.53.1
+   Compiling zvariant_utils v2.1.0
+   Compiling enumflags2_derive v0.7.12
+   Compiling zvariant_derive v4.2.0
+   Compiling thiserror-impl v1.0.69
+   Compiling tracing-attributes v0.1.31
+   Compiling zbus_macros v4.4.0
+   Compiling tracing v0.1.44
+   Compiling polling v3.11.0
+   Compiling enumflags2 v0.7.12
+   Compiling uda-core v0.2.1 (/home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui/3rd/UniDesktop-SDK/crates/uda-core)
+   Compiling zvariant v4.2.0
+   Compiling zbus_names v3.0.0
+   Compiling zbus v4.4.0
+   Compiling uda-platform-linux v0.2.1 (/home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui/3rd/UniDesktop-SDK/crates/uda-platform-linux)
+   Compiling uda-ffi v0.2.1 (/home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui/3rd/UniDesktop-SDK/crates/uda-ffi)
+    Finished `release` profile [optimized] target(s) in 24.08s
+[ 96%] Built target uda_ffi
+[ 97%] Building CXX object CMakeFiles/whsport_gui.dir/src/engine_client.cpp.o
+[ 98%] Building CXX object CMakeFiles/whsport_gui.dir/_deps/eui-neo-src/core/app/glfw_app_main.cpp.o
+[ 98%] Building CXX object CMakeFiles/whsport_gui.dir/src/main.cpp.o
+[ 99%] Building CXX object CMakeFiles/whsport_gui.dir/src/uda_bridge.cpp.o
+[100%] Linking CXX executable whsport_gui
+[100%] Built target whsport_gui
