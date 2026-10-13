@@ -1,0 +1,7 @@
+# 让 clangd 用 CMake 生成的编译数据库解析包含路径
+# （EUI-NEO / nlohmann 是 FetchContent 拉下来的，不在系统 include 里）。
+CompileFlags:
+  CompilationDatabase: build
+Diagnostics:
+  Suppress:
+    - unknown-argument

@@ -12,6 +12,9 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
 endif()
 
+# 供 clangd / IDE 解析 FetchContent 拉来的 EUI-NEO 头（配合 gui/.clangd）
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 option(WITH_UDA "接入 UniDesktop SDK（Windows/Linux 通知/托盘；macOS 自动关闭）" ON)
 if(APPLE)
     set(WITH_UDA OFF)
@@ -89,3 +92,11 @@ endif()
 
 # EUI-NEO：自动加入窗口入口/输入/渲染后端（不要自己写 main 循环源文件）
 eui_neo_configure_app(whsport_gui)
+
+# EUI-NEO 在 Release 下默认 -fno-exceptions；本应用在后台线程里用异常做错误分发，
+# 异常不会穿过 EUI-NEO 回调边界，所以把自己的目标重新打开异常（后加覆盖先加）。
+if(MSVC)
+    target_compile_options(whsport_gui PRIVATE /EHsc)
+else()
+    target_compile_options(whsport_gui PRIVATE -fexceptions)
+endif()

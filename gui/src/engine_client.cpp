@@ -3,7 +3,7 @@
 #include <cstdio>
 #include <stdexcept>
 
-#if defined(WHS_WINDOWS)
+#if WHS_WINDOWS
 #include <windows.h>
 #else
 #include <csignal>
@@ -22,7 +22,7 @@ bool EngineClient::start(const std::string& program,
                          const std::vector<std::string>& args) {
     if (handle_ != 0) return true;
 
-#if defined(WHS_WINDOWS)
+#if WHS_WINDOWS
     SECURITY_ATTRIBUTES sa{sizeof(sa), nullptr, TRUE};
     HANDLE inR = nullptr, inW = nullptr, outR = nullptr, outW = nullptr;
     if (!CreatePipe(&inR, &inW, &sa, 0) || !CreatePipe(&outR, &outW, &sa, 0)) return false;
@@ -79,7 +79,7 @@ bool EngineClient::start(const std::string& program,
 
 void EngineClient::stop() {
     if (handle_ == 0) return;
-#if defined(WHS_WINDOWS)
+#if WHS_WINDOWS
     CloseHandle((HANDLE)writeFd_);
     CloseHandle((HANDLE)readFd_);
     TerminateProcess((HANDLE)handle_, 0);
@@ -91,7 +91,7 @@ void EngineClient::stop() {
     waitpid((pid_t)handle_, nullptr, 0);
 #endif
     handle_ = 0; writeFd_ = readFd_ = 0;
-#if defined(WHS_WINDOWS)
+#if WHS_WINDOWS
     writeFd_ = readFd_ = nullptr;
 #else
     writeFd_ = readFd_ = -1;
@@ -100,7 +100,7 @@ void EngineClient::stop() {
 
 bool EngineClient::writeLine(const std::string& line) {
     std::string payload = line + "\n";
-#if defined(WHS_WINDOWS)
+#if WHS_WINDOWS
     DWORD written = 0;
     return WriteFile((HANDLE)writeFd_, payload.data(), (DWORD)payload.size(), &written,
                      nullptr) && written == payload.size();
@@ -119,7 +119,7 @@ bool EngineClient::readLine(std::string& out) {
     out.clear();
     char ch;
     while (true) {
-#if defined(WHS_WINDOWS)
+#if WHS_WINDOWS
         DWORD read = 0;
         if (!ReadFile((HANDLE)readFd_, &ch, 1, &read, nullptr) || read == 0) return !out.empty();
 #else

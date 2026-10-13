@@ -24,3 +24,63 @@
 -- Configuring done (23.5s)
 -- Generating done (0.0s)
 -- Build files have been written to: /home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui/build
+[ 72%] Linking C static library libeui_md4c.a
+[ 72%] Built target eui_md4c
+[ 73%] Linking C static library libfreetype.a
+[ 73%] Built target freetype
+[ 74%] Building CXX object _deps/eui-neo-build/CMakeFiles/eui_neo.dir/core/render/render_backend.cpp.o
+[ 76%] Building CXX object _deps/eui-neo-build/CMakeFiles/eui_neo.dir/core/platform/async.cpp.o
+[ 77%] Building CXX object _deps/eui-neo-build/CMakeFiles/eui_neo.dir/core/platform/network.cpp.o
+[ 78%] Building CXX object _deps/eui-neo-build/CMakeFiles/eui_neo.dir/core/render/primitive.cpp.o
+[ 75%] Building CXX object _deps/eui-neo-build/CMakeFiles/eui_neo.dir/core/platform/platform.cpp.o
+[ 78%] Building CXX object _deps/eui-neo-build/CMakeFiles/eui_neo.dir/core/platform/performance_stats.cpp.o
+[ 79%] Building CXX object _deps/eui-neo-build/CMakeFiles/eui_neo.dir/core/render/image_source.cpp.o
+[ 79%] Building CXX object _deps/eui-neo-build/CMakeFiles/eui_neo.dir/core/render/image.cpp.o
+[ 81%] Building CXX object _deps/eui-neo-build/CMakeFiles/eui_neo.dir/core/render/shadertoy_primitive.cpp.o
+[ 81%] Building CXX object _deps/eui-neo-build/CMakeFiles/eui_neo.dir/core/render/shadertoy_json.cpp.o
+[ 82%] Building CXX object _deps/eui-neo-build/CMakeFiles/eui_neo.dir/core/render/image_facade.cpp.o
+[ 82%] Building CXX object _deps/eui-neo-build/CMakeFiles/eui_neo.dir/core/platform/json.cpp.o
+[ 84%] Building CXX object _deps/eui-neo-build/CMakeFiles/eui_neo.dir/core/render/shadertoy.cpp.o
+[ 84%] Building C object _deps/eui-neo-build/CMakeFiles/eui_neo.dir/core/platform/native_bridge.c.o
+[ 85%] Building CXX object _deps/eui-neo-build/CMakeFiles/eui_neo.dir/core/render/image_stream.cpp.o
+[ 86%] Building CXX object _deps/eui-neo-build/CMakeFiles/eui_neo.dir/core/render/text.cpp.o
+[ 86%] Building CXX object _deps/eui-neo-build/CMakeFiles/eui_neo.dir/core/render/stb_image_impl.cpp.o
+[ 87%] Building CXX object _deps/eui-neo-build/CMakeFiles/eui_neo.dir/core/window/window_backend.cpp.o
+[ 88%] Building CXX object _deps/eui-neo-build/CMakeFiles/eui_neo.dir/core/render/opengl/opengl_image.cpp.o
+[ 88%] Building CXX object _deps/eui-neo-build/CMakeFiles/eui_neo.dir/core/render/opengl/opengl_backend.cpp.o
+[ 89%] Building CXX object _deps/eui-neo-build/CMakeFiles/eui_neo.dir/core/window/window_input_backend.cpp.o
+[ 90%] Building C object _deps/eui-neo-build/CMakeFiles/eui_neo.dir/core/platform/tray_bridge.c.o
+[ 91%] Building CXX object _deps/eui-neo-build/CMakeFiles/eui_neo.dir/core/render/opengl/opengl_primitives.cpp.o
+[ 92%] Building CXX object _deps/eui-neo-build/CMakeFiles/eui_neo.dir/core/render/opengl/opengl_shadertoy.cpp.o
+[ 93%] Building CXX object _deps/eui-neo-build/CMakeFiles/eui_neo.dir/core/render/opengl/opengl_text.cpp.o
+[ 93%] Building C object _deps/eui-neo-build/CMakeFiles/eui_neo.dir/core/platform/ime_bridge.c.o
+[ 94%] Building C object _deps/eui-neo-build/CMakeFiles/eui_neo.dir/3rd/yyjson-0.12.0/src/yyjson.c.o
+[ 95%] Linking CXX static library libeui_neo.a
+[ 95%] Built target eui_neo
+[ 96%] Building CXX object CMakeFiles/whsport_gui.dir/src/main.cpp.o
+[ 97%] Building CXX object CMakeFiles/whsport_gui.dir/src/engine_client.cpp.o
+[ 98%] Building CXX object _deps/eui-neo-build/modules/serial/CMakeFiles/eui_neo_module_serial.dir/serial.cpp.o
+[ 99%] Building CXX object CMakeFiles/whsport_gui.dir/_deps/eui-neo-src/core/app/glfw_app_main.cpp.o
+/home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui/src/engine_client.cpp:7:10: fatal error: windows.h: No such file or directory
+    7 | #include <windows.h>
+      |          ^~~~~~~~~~~
+compilation terminated.
+make[2]: *** [CMakeFiles/whsport_gui.dir/build.make:93: CMakeFiles/whsport_gui.dir/src/engine_client.cpp.o] Error 1
+make[2]: *** Waiting for unfinished jobs....
+[ 99%] Linking CXX static library libeui_neo_module_serial.a
+[ 99%] Built target eui_neo_module_serial
+/home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui/src/main.cpp: In lambda function:
+/home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui/src/main.cpp:67:40: error: exception handling disabled, use ‘-fexceptions’ to enable
+   67 |         } catch (const std::exception& exc) {
+      |                                        ^~~
+/home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui/src/main.cpp:68:27: error: ‘exc’ was not declared in this scope; did you mean ‘exp’?
+   68 |             st().status = exc.what();
+      |                           ^~~
+      |                           exp
+/home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui/src/main.cpp: In function ‘const app::DslAppConfig& app::dslAppConfig()’:
+/home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui/src/main.cpp:161:10: error: ‘struct app::DslAppConfig’ has no member named ‘appId’
+  161 |         .appId("whsport")
+      |          ^~~~~
+make[2]: *** [CMakeFiles/whsport_gui.dir/build.make:79: CMakeFiles/whsport_gui.dir/src/main.cpp.o] Error 1
+make[1]: *** [CMakeFiles/Makefile2:266: CMakeFiles/whsport_gui.dir/all] Error 2
+make: *** [Makefile:111: all] Error 2

@@ -158,9 +158,7 @@ const DslAppConfig& dslAppConfig() {
     static const DslAppConfig config = DslAppConfig{}
         .title("运动世界校园 · 工具")
         .pageId("whsport")
-        .appId("whsport")
         .windowSize(980, 720)
-        .highDpi(true)
         .textFont("YouSheBiaoTiHei-2.ttf");
     return config;
 }
@@ -235,9 +233,7 @@ void compose(eui::Ui& ui, const eui::Screen& screen) {
             }
 
             if (!s.metrics.empty()) {
-                components::panel(ui, "metrics").content([&] {
-                    ui.text("metrics_text").text(s.metrics).fontSize(14.0f).build();
-                }).build();
+                ui.text("metrics_text").text(s.metrics).fontSize(14.0f).build();
             }
 
             components::toast(ui, "toast")

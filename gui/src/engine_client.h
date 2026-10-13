@@ -31,7 +31,7 @@ private:
 
     std::mutex mutex_;
     long long nextId_ = 1;
-#if defined(WHS_WINDOWS)
+#if WHS_WINDOWS
     void* handle_ = nullptr;   // HANDLE
     void* writeFd_ = nullptr;  // HANDLE
     void* readFd_ = nullptr;   // HANDLE
