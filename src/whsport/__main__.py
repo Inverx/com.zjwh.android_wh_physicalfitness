@@ -11,6 +11,7 @@ COMMANDS = {
     "policy": ("whsport.cli.policy_cli", "学校跑步规则与电子围栏查询"),
     "history": ("whsport.cli.history_cli", "历史运动记录查询"),
     "rank": ("whsport.cli.rank_cli", "校园多维排行榜查询"),
+    "gui": ("whsport.gui", "图形界面（Tkinter，最轻便）"),
 }
 
 

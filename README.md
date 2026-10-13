@@ -43,6 +43,22 @@ python -m whsport            # 查看全部命令
 | `wh-policy`  | `python -m whsport policy` |
 | `wh-history` | `python -m whsport history` |
 | `wh-rank`    | `python -m whsport rank` |
+| `wh-gui`     | `python -m whsport gui` |
+
+### 图形界面（最轻便，零额外依赖）
+
+用 Python 标准库 Tkinter，不需要安装任何新依赖：
+
+```bash
+python -m whsport gui      # 或 wh-gui
+```
+
+界面分「跑步 / 查询」两页：
+- **跑步**：登录、填写参数，点「**① 预览（本地 dry-run）**」会在本地生成轨迹并画出来（**不联网、不提交**），
+  确认无误后再点「**② 提交到服务器**」（会二次确认）；
+- **查询**：一键查学期成绩 / 规则 / 历史 / 排行榜。
+
+> 安全默认：预览纯本地；提交必须先在预览页生成、并弹窗二次确认。
 
 ### 登录并保存凭据
 

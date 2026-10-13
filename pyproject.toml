@@ -25,6 +25,7 @@ wh-score = "whsport.cli.score_cli:main"
 wh-policy = "whsport.cli.policy_cli:main"
 wh-history = "whsport.cli.history_cli:main"
 wh-rank = "whsport.cli.rank_cli:main"
+wh-gui = "whsport.gui:main"
 
 [build-system]
 requires = ["uv_build>=0.12.7,<0.13.0"]
