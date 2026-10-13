@@ -1,4 +1,4 @@
-﻿
+
 
 class RankType:
     PERSONAL = 1

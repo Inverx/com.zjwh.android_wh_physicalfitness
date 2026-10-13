@@ -1,0 +1,2 @@
+# Normalize line endings to LF for text files; leave binaries alone.
+* text=auto eol=lf
