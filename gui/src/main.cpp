@@ -4,9 +4,9 @@
 #include "eui_neo.h"
 
 #include "engine_client.h"
+#include "uda_bridge.h"
 
 #include <functional>
-#include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -34,6 +34,7 @@ struct State {
     std::string metrics;
     EngineClient engine;
     bool started = false;
+    bool credLoaded = false;
 };
 
 State& st() {
@@ -67,6 +68,7 @@ void runAsync(std::function<void()> work) {
         } catch (const std::exception& exc) {
             st().status = exc.what();
             st().toastVisible = true;
+            uda_bridge::notify("出错了", exc.what());
         }
         st().busy = false;
         app::requestUpdate();
@@ -118,6 +120,7 @@ void doPreview() {
                       m.value("calorie", 0.0), m.value("power", 0.0));
         st().metrics = buf;
         st().status = "预览完成（未上传）";
+        uda_bridge::notify("预览完成", st().status);
     });
 }
 
@@ -128,6 +131,7 @@ void doSubmit() {
     runAsync([] {
         auto data = st().engine.request("run.submit", runParams());
         st().status = "提交返回: " + data.value("result", nlohmann::json::object()).dump();
+        uda_bridge::notify("提交结果", st().status.substr(0, 120));
     });
 }
 
@@ -166,6 +170,12 @@ const DslAppConfig& dslAppConfig() {
 void compose(eui::Ui& ui, const eui::Screen& screen) {
     ensureEngine();
     State& s = st();
+
+    // 首次打开就把开发机/上次登录保存的凭据读出来（后台，不卡首帧）。
+    if (!s.credLoaded) {
+        s.credLoaded = true;
+        runAsync([] { applyCredentials(); });
+    }
 
     ui.column("root")
         .size(screen.width, screen.height)

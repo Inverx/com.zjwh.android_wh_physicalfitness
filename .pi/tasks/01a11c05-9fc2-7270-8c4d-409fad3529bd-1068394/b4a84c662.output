@@ -1,0 +1,12 @@
+-- Using the multi-header code from /home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui/build/_deps/json-src/include/
+-- EUI render backend: requested=opengl, resolved=opengl
+-- Using package GLFW target: glfw
+-- Using bundled glad source: /home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui/build/_deps/eui-neo-src/3rd/glad
+-- Using bundled tray source: /home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui/build/_deps/eui-neo-src/3rd/tray
+-- Using bundled FreeType source: /home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui/build/_deps/eui-neo-src/3rd/freetype
+-- Using bundled zlib source: /home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui/build/_deps/eui-neo-src/3rd/zlib-1.3.1
+-- Using bundled libpng source: /home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui/build/_deps/eui-neo-src/3rd/libpng-1.6.43
+-- Using bundled MD4C source: /home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui/build/_deps/eui-neo-src/3rd/md4c
+-- Configuring done (0.7s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui/build

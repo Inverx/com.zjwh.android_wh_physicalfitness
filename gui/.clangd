@@ -3,5 +3,8 @@
 CompileFlags:
   CompilationDatabase: build
 Diagnostics:
+  # eui_neo.h 是 EUI-NEO 推荐的唯一伞头（DslAppConfig / eui::Ui 都经它导出），
+  # clangd 的 include-cleaner 会把符号归到内层头、误报未使用，这里关掉。
+  UnusedIncludes: None
   Suppress:
     - unknown-argument

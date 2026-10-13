@@ -14,3 +14,7 @@ gui/build/
 packaging/build/
 packaging/dist/
 *.spec.bak
+
+# GUI 的 vendored 依赖 / 构建产物
+gui/3rd/
+gui/compile_flags.txt

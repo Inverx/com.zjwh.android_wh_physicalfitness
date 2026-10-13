@@ -42,27 +42,28 @@ else()
     FetchContent_MakeAvailable(EUI-NEO)
 endif()
 
-# ── UniDesktop SDK（可选，C-ABI 动态库）────────────────────────────────
+# ── UniDesktop SDK（可选；Rust workspace，用 cargo 构建，不能用 FetchContent）
 if(WITH_UDA)
-    FetchContent_Declare(uda
-        GIT_REPOSITORY https://github.com/UniDesktop/SDK.git
-        GIT_TAG        main
-        GIT_SHALLOW    TRUE
-        SOURCE_SUBDIR  crates)   # 不 add_subdirectory，仅取源码
-    FetchContent_MakeAvailable(uda)
-    # 用 cargo 构建 C-ABI 动态库
+    set(UDA_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/3rd/UniDesktop-SDK"
+        CACHE PATH "UniDesktop SDK 源码目录")
+    if(NOT EXISTS "${UDA_SOURCE_DIR}/crates/uda-ffi/Cargo.toml")
+        message(FATAL_ERROR
+            "WITH_UDA=ON 需要 UniDesktop SDK 源码：\n"
+            "  git clone https://github.com/UniDesktop/SDK '${UDA_SOURCE_DIR}'\n"
+            "或用 -DUDA_SOURCE_DIR=/path 指定；也可 -DWITH_UDA=OFF 关闭。")
+    endif()
     if(WIN32)
-        set(UDA_LIB "${uda_SOURCE_DIR}/target/release/uda_ffi.dll")
+        set(UDA_LIB "${UDA_SOURCE_DIR}/target/release/uda_ffi.dll")
     elseif(APPLE)
-        set(UDA_LIB "${uda_SOURCE_DIR}/target/release/libuda_ffi.dylib")
+        set(UDA_LIB "${UDA_SOURCE_DIR}/target/release/libuda_ffi.dylib")
     else()
-        set(UDA_LIB "${uda_SOURCE_DIR}/target/release/libuda_ffi.so")
+        set(UDA_LIB "${UDA_SOURCE_DIR}/target/release/libuda_ffi.so")
     endif()
     add_custom_command(
         OUTPUT "${UDA_LIB}"
         COMMAND cargo build --release -p uda-ffi
-        WORKING_DIRECTORY "${uda_SOURCE_DIR}"
-        COMMENT "构建 UniDesktop C-ABI"
+        WORKING_DIRECTORY "${UDA_SOURCE_DIR}"
+        COMMENT "用 cargo 构建 UniDesktop C-ABI"
         VERBATIM)
     add_custom_target(uda_ffi DEPENDS "${UDA_LIB}")
 endif()
@@ -70,7 +71,8 @@ endif()
 # ── 应用 ───────────────────────────────────────────────────────────────
 add_executable(whsport_gui
     src/main.cpp
-    src/engine_client.cpp)
+    src/engine_client.cpp
+    src/uda_bridge.cpp)
 
 target_include_directories(whsport_gui PRIVATE src)
 target_link_libraries(whsport_gui PRIVATE nlohmann_json::nlohmann_json)
@@ -85,6 +87,7 @@ endif()
 if(WITH_UDA)
     add_dependencies(whsport_gui uda_ffi)
     target_compile_definitions(whsport_gui PRIVATE WHS_HAVE_UDA=1)
+    target_include_directories(whsport_gui PRIVATE "${UDA_SOURCE_DIR}/include")
     target_link_libraries(whsport_gui PRIVATE "${UDA_LIB}")
 else()
     target_compile_definitions(whsport_gui PRIVATE WHS_HAVE_UDA=0)
