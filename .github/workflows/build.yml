@@ -1,0 +1,77 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  package:
+    name: ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            uda_lib: target/release/libuda_ffi.so
+          - os: macos-latest
+            platform: macos
+            uda_lib: ''
+          - os: windows-latest
+            platform: windows
+            uda_lib: target/release/uda_ffi.dll
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      # ── Python 引擎（冻结成单文件）──────────────────────────────
+      - name: Build engine (PyInstaller)
+        working-directory: packaging
+        run: |
+          uv sync --project ..
+          uv pip install --project .. pyinstaller
+          uv run --project .. pyinstaller --noconfirm whsport-engine.spec
+
+      # ── 三平台系统依赖（EUI-NEO：GLFW + OpenGL）──────────────────
+      - name: System deps (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xorg-dev libgl1-mesa-dev libglu1-mesa-dev \
+            libwayland-dev libxkbcommon-dev
+
+      - name: System deps (macOS)
+        if: matrix.platform == 'macos'
+        run: brew list glfw || brew install glfw
+
+      # ── UDA（仅 Win / Linux；macOS 自动跳过）─────────────────────
+      - name: Install Rust
+        if: matrix.platform != 'macos'
+        uses: dtolnay/rust-toolchain@stable
+
+      # ── GUI ─────────────────────────────────────────────────────
+      - name: Configure & build GUI
+        working-directory: gui
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release --parallel
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: whsport-${{ matrix.platform }}
+          path: |
+            packaging/dist/whsport-engine*
+            gui/build/whsport_gui*
+            gui/build/Release/whsport_gui*
+          if-no-files-found: warn

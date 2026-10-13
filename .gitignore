@@ -8,3 +8,9 @@ credentials.json
 
 # 含真实记录数据的对比图，不入库
 experiments/record_compare.png
+
+# C++ GUI / 打包产物
+gui/build/
+packaging/build/
+packaging/dist/
+*.spec.bak
