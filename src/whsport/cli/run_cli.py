@@ -4,14 +4,14 @@ import random
 import time
 
 from whsport.coordinate_utils import validate_coordinate
-from whsport.security_utils import redact_data
 from whsport.running_protocol import (
-    OutdoorRunRecordBuilder,
     DEFAULT_BODY_WEIGHT_KG,
+    OutdoorRunRecordBuilder,
     estimate_stride_cm,
     generate_synthetic_gps_track,
     validate_outdoor_record_consistency,
 )
+from whsport.security_utils import redact_data
 
 
 def main():

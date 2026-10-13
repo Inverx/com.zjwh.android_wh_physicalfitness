@@ -1,8 +1,9 @@
 """Shared coordinate validation for record generation and CLI input."""
 
 import math
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Iterator, Tuple
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -34,7 +35,7 @@ class Coordinate:
         yield self.longitude
 
 
-def validate_coordinate(latitude: float, longitude: float) -> Coordinate:
+def validate_coordinate(latitude: Any, longitude: Any) -> Coordinate:
     """Return numeric coordinates or raise a clear validation error."""
     try:
         latitude = float(latitude)

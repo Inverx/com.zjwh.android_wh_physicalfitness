@@ -1,5 +1,4 @@
-﻿from typing import Optional
-
+﻿
 
 class RankType:
     PERSONAL = 1
@@ -25,16 +24,16 @@ class IndoorDateRange:
 
 
 class LeaderboardRequestBuilder:
-    def __init__(self, unid: int = 0, uid: Optional[int] = None):
+    def __init__(self, unid: int = 0, uid: int | None = None):
         self.unid = int(unid) if unid else 0
         self.uid = uid
 
     def build_main_rank_body(self,
-                             unid: Optional[int] = None,
+                             unid: int | None = None,
                              rank_type: int = RankType.PERSONAL,
                              sort_type: int = RankSortType.DAY,
-                             date_str: Optional[str] = None,
-                             gender: Optional[int] = RankGender.ALL) -> dict:
+                             date_str: str | None = None,
+                             gender: int | None = RankGender.ALL) -> dict:
         target_unid = int(unid) if unid is not None else self.unid
         body = {
             "unid": target_unid,
@@ -61,7 +60,7 @@ class LeaderboardRequestBuilder:
         return body
 
     def build_history_rank_body(self,
-                                 unid: Optional[int] = None,
+                                 unid: int | None = None,
                                  sort_type: int = RankSortType.DAY,
                                  gender: int = RankGender.FEMALE,
                                 page_num: int = 1,
@@ -77,7 +76,7 @@ class LeaderboardRequestBuilder:
         return body
 
     def build_cheat_list_body(self,
-                              unid: Optional[int] = None,
+                              unid: int | None = None,
                               page_num: int = 1,
                               page_size: int = 20) -> dict:
         target_unid = int(unid) if unid is not None else self.unid

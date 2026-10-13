@@ -7,36 +7,37 @@ import os
 import subprocess
 import tempfile
 import time
-from typing import Dict, Optional, Tuple, Union, Any, Callable, List
 import uuid
+from collections.abc import Callable
+from typing import Any
 
 import requests
 
+from whsport.coordinate_utils import validate_coordinate
+from whsport.geetest_solver import GEETEST_IDS, GeeTestV4Solver
 from whsport.netsec_crypto import (
     SPORT_STATIC_SALT,
-    compute_token_sign,
+    NetSecCrypto,
     NetSecSession,
-    NetSecCrypto
+    compute_token_sign,
 )
-from whsport.geetest_solver import GeeTestV4Solver, GEETEST_IDS, GeeTestResult
-from whsport.running_protocol import (
-    OutdoorRunRecordBuilder,
-    IndoorRunRecordBuilder,
-    generate_synthetic_gps_track,
-    validate_outdoor_record_consistency,
-    build_obs_payload,
-    order_points_loop,
-    gcj02_to_wgs84,
-    FivePoint,
-    DEFAULT_BODY_WEIGHT_KG,
-)
-from whsport.coordinate_utils import validate_coordinate
 from whsport.rank_protocol import (
-    RankType,
-    RankSortType,
-    RankGender,
     IndoorDateRange,
-    LeaderboardRequestBuilder
+    LeaderboardRequestBuilder,
+    RankGender,
+    RankSortType,
+    RankType,
+)
+from whsport.running_protocol import (
+    DEFAULT_BODY_WEIGHT_KG,
+    FivePoint,
+    IndoorRunRecordBuilder,
+    OutdoorRunRecordBuilder,
+    build_obs_payload,
+    gcj02_to_wgs84,
+    generate_synthetic_gps_track,
+    order_points_loop,
+    validate_outdoor_record_consistency,
 )
 from whsport.security_utils import install_redaction_filter
 
@@ -70,15 +71,15 @@ DEFAULT_HOST_DISCOVERY = "https://discovery.gxapp.iydsj.com"
 
 class SportClient:
     def __init__(self,
-                 uid: Optional[Union[int, str]] = None,
-                 token: Optional[str] = None,
+                 uid: int | str | None = None,
+                 token: str | None = None,
                  unid: int = 0,
-                 device_id: Optional[str] = None,
+                 device_id: str | None = None,
                  app_version: str = "7.3.90",     # App版本
                  os_version: str = "15",          # Android版本
                  device_name: str = "SM-A5460",    # 设备型号
-                 proxy: Optional[str] = None,
-                 adb_path: Optional[str] = None,
+                 proxy: str | None = None,
+                 adb_path: str | None = None,
                  verify_response_signature: bool = False):
         self.uid = str(uid) if uid else None
         self.token = token
@@ -98,7 +99,7 @@ class SportClient:
         self.geetest_solver = GeeTestV4Solver()
         self.rank_builder = LeaderboardRequestBuilder(unid=self.unid, uid=int(self.uid) if self.uid else None)
 
-    def set_credentials(self, uid: Union[int, str], token: str, unid: Optional[int] = None):
+    def set_credentials(self, uid: int | str, token: str, unid: int | None = None):
         self.uid = str(uid)
         self.token = token
         if unid is not None:
@@ -107,11 +108,11 @@ class SportClient:
         if self.uid:
             self.rank_builder.uid = int(self.uid)
 
-    def build_public_headers(self, custom_headers: Optional[Dict[str, str]] = None, sign_params: Optional[Dict[str, str]] = None) -> collections.OrderedDict:
+    def build_public_headers(self, custom_headers: dict[str, str] | None = None, sign_params: dict[str, str] | None = None) -> collections.OrderedDict:
         now_ms = int(time.time() * 1000)
         nonce = str(uuid.uuid4())
 
-        headers = collections.OrderedDict([
+        headers: collections.OrderedDict[str, str] = collections.OrderedDict([
             ("Accept", "application/json"),   # 接收 JSON
             ("Content-Type", "application/json"),    # 请求体为 JSON
             ("appVersion", self.app_version),    # App 版本
@@ -161,16 +162,16 @@ class SportClient:
         headers["tokenSign"] = compute_token_sign(sign_dict)
         return headers
 
-    def build_header_sign(self, headers: Dict[str, str]) -> Dict[str, str]:
+    def build_header_sign(self, headers: dict[str, str]) -> dict[str, str]:
         headers_json = json.dumps(headers, separators=(",", ":"), ensure_ascii=False)
         return self.crypto.encrypt_request(headers_json.strip(), self.session)
 
     def execute_request(self,
                         method: str,
                         url: str,
-                        body_plain: Optional[Union[dict, list]] = None,
-                        custom_headers: Optional[Dict[str, str]] = None,
-                        sign_params: Optional[Dict[str, str]] = None,
+                        body_plain: dict | list | None = None,
+                        custom_headers: dict[str, str] | None = None,
+                        sign_params: dict[str, str] | None = None,
                         timeout: int = 25) -> Any:
         headers = self.build_public_headers(custom_headers, sign_params)
         h_sign = self.build_header_sign(headers)
@@ -285,7 +286,6 @@ class SportClient:
             "method": method.upper(),
             "url": url,
             "headers": headers,
-            "timeout": timeout
         }
         if self.proxy:
             req_kwargs["proxies"] = {"http": self.proxy, "https": self.proxy}
@@ -293,7 +293,7 @@ class SportClient:
             req_kwargs["json"] = encrypted_body
 
         try:
-            resp = requests.request(**req_kwargs)
+            resp = requests.request(timeout=timeout, **req_kwargs)
         except requests.RequestException as exc:
             return {"error": -1, "message": f"Network request failed: {exc}"}
         if resp.status_code == 200:
@@ -317,7 +317,7 @@ class SportClient:
 
     def _put_presigned_json(self,
                             signed_url: str,
-                            headers: Dict[str, str],
+                            headers: dict[str, str],
                             payload: dict,
                             timeout: int = 25) -> dict:
         payload_bytes = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
@@ -395,12 +395,11 @@ class SportClient:
                 "url": signed_url,
                 "headers": headers,
                 "data": payload_bytes,
-                "timeout": timeout,
             }
             if self.proxy:
                 request_kwargs["proxies"] = {"http": self.proxy, "https": self.proxy}
             try:
-                response = requests.put(**request_kwargs)
+                response = requests.put(timeout=timeout, **request_kwargs)
             except requests.RequestException as exc:
                 return {"error": -1, "message": f"OBS upload failed: {exc}"}
             status_code = response.status_code
@@ -440,7 +439,7 @@ class SportClient:
     def login(self,
               username: str,
               password: str,
-              progress_callback: Optional[Callable[[str], None]] = None) -> Dict[str, Any]:
+              progress_callback: Callable[[str], None] | None = None) -> dict[str, Any]:
         def log(msg: str):
             if progress_callback:
                 progress_callback(msg)
@@ -473,7 +472,7 @@ class SportClient:
 
         log("正在提交登录...")
         login_url = f"{DEFAULT_HOST_RUN}/api/v70100/login"
-        auth_raw = f"{username}:{password}".encode("utf-8")
+        auth_raw = f"{username}:{password}".encode()
         custom_headers = {
             "Authorization": "Basic " + base64.b64encode(auth_raw).decode("ascii")
         }
@@ -542,8 +541,8 @@ class SportClient:
     def get_main_rank(self,
                       rank_type: int = RankType.PERSONAL,
                       sort_type: int = RankSortType.DAY,
-                      gender: Optional[int] = RankGender.ALL,
-                      date_str: Optional[str] = None) -> dict:
+                      gender: int | None = RankGender.ALL,
+                      date_str: str | None = None) -> dict:
         url = f"{DEFAULT_HOST_DISCOVERY}/api/v41/rank"
         body = self.rank_builder.build_main_rank_body(
             unid=self.unid,
@@ -612,9 +611,9 @@ class SportClient:
         """Fetch the server-issued check-in points around (lat, lon)."""
         url = f"{DEFAULT_HOST_RUN}/api/v560/get/1/distance/1"
         http_url = url.replace("https://", "http://", 1)
-        sign = hashlib.md5((http_url + SPORT_STATIC_SALT).encode("utf-8")).hexdigest().lower()
+        sign = hashlib.new("md5", (http_url + SPORT_STATIC_SALT).encode("utf-8")).hexdigest().lower()  # nosemgrep: python.lang.security.insecure-hash-function
         ts = int(time.time() * 1000)
-        runec_input = "%d%.6f%.6f%d" % (int(self.uid or 0), lon, lat, (ts // 1000) * 1000)
+        runec_input = f"{int(self.uid or 0)}{lon:.6f}{lat:.6f}{(ts // 1000) * 1000}"
         runec = self.crypto.encrypt_observed(runec_input, self.session, ts)
         body = {
             "sportType": 4, "longitude": lon, "latitude": lat, "sign": sign,
@@ -634,10 +633,10 @@ class SportClient:
                        total_time_sec: int = 845,          # 时长，秒
                        total_steps: int = 2487,            # 总步数
                        sport_type: int = 1,                # 运动类型
-                       start_lat: Optional[float] = None,    # 起点纬度
-                       start_lon: Optional[float] = None,    # 起点经度
+                       start_lat: float | None = None,    # 起点纬度
+                       start_lon: float | None = None,    # 起点经度
                        weight_kg: float = DEFAULT_BODY_WEIGHT_KG,  # 体重，用于估算卡路里/功率
-                       policy: Optional[int] = None,   # 覆盖提交体 policy（默认用服务端值）
+                       policy: int | None = None,   # 覆盖提交体 policy（默认用服务端值）
                        dry_run: bool = False) -> dict:
 
         if start_lat is None or start_lon is None:
@@ -653,7 +652,7 @@ class SportClient:
             raise ValueError("total_steps cannot be negative")
 
     # 当前时间作为结束时间
-    
+
         stop_time_ms = int(time.time() * 1000)
 
     # 根据时长计算开始时间
@@ -699,7 +698,7 @@ class SportClient:
         gps_points, default_five = generate_synthetic_gps_track(
             start_lat=start_lat,
             start_lon=start_lon,
-            total_distance_m=total_distance_m,
+            total_distance_m=int(round(total_distance_m)),
             total_time_sec=total_time_sec,
             start_time_ms=start_time_ms,
             total_steps=total_steps,

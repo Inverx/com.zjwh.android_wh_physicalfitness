@@ -2,8 +2,8 @@ import argparse
 import datetime
 import json
 
-from whsport.sport_client import SportClient
 from whsport.rank_protocol import RankType
+from whsport.sport_client import SportClient
 
 
 def main():
@@ -68,6 +68,7 @@ def main():
     client = SportClient(uid=uid, token=token, unid=int(unid or 0), proxy=args.proxy)
     choice = int(args.type)
     period_name = "日榜" if args.sort == "1" else "月榜"
+    res: dict = {}
 
     if choice == 1:
         gender_name = "女" if args.gender == "0" else "男"

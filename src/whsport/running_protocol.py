@@ -1,13 +1,11 @@
 import base64
-import collections
 import gzip
 import hashlib
 import json
 import math
 import random
-import time
 import uuid
-from typing import Dict, List, Optional, Tuple, Union
+
 from whsport.coordinate_utils import Coordinate, coordinates_match, validate_coordinate
 
 SPORT_STATIC_SALT = "2slhe02lsfiwowlcixisla_sls-_slaor"
@@ -67,7 +65,7 @@ def estimate_stride_cm(total_distance_m: float, total_steps: int) -> float:
     return round(total_distance_m / total_steps * 100.0, 1)
 
 
-def _smooth_series(values: List[float], window: int = 5) -> List[float]:
+def _smooth_series(values: list[float], window: int = 5) -> list[float]:
     """Light moving average (device-like filtering for derived metrics)."""
     n = len(values)
     if n == 0 or window <= 1:
@@ -93,11 +91,11 @@ def elevation_gain(elevations) -> float:
 
 
 def estimate_total_ascent(total_distance_m: float,
-                          rng: Optional[random.Random] = None) -> int:
+                          rng: random.Random | None = None) -> int:
     """Fallback climb estimate when no elevation profile is available."""
     if total_distance_m <= 0:
         return 0
-    rng = rng or random
+    rng = rng if rng is not None else random.Random()
     return int(round((total_distance_m / 1000.0) * rng.uniform(3.0, 9.0)))
 
 
@@ -128,7 +126,7 @@ def _gcj_transform_lon(x: float, y: float) -> float:
     return ret
 
 
-def wgs84_to_gcj02(lat: float, lon: float) -> Tuple[float, float]:
+def wgs84_to_gcj02(lat: float, lon: float) -> tuple[float, float]:
     """Convert WGS-84 to GCJ-02, as the app stores/renders on the map."""
     if _out_of_china(lat, lon):
         return lat, lon
@@ -143,7 +141,7 @@ def wgs84_to_gcj02(lat: float, lon: float) -> Tuple[float, float]:
     return round(lat + dlat, 7), round(lon + dlon, 7)
 
 
-def gcj02_to_wgs84(lat: float, lon: float) -> Tuple[float, float]:
+def gcj02_to_wgs84(lat: float, lon: float) -> tuple[float, float]:
     """Convert GCJ-02 back to WGS-84 (single-step inverse, ~1 m error).
 
     The server hands out check-in points as lat/lon (BD-09) + glat/glon (GCJ-02);
@@ -167,7 +165,7 @@ def legacy_validate_coordinate(latitude: float, longitude: float) -> Coordinate:
     return validate_coordinate(latitude, longitude)
 
 
-def compute_sport_signature(field_map: Dict[str, Union[str, int, float, bool, None]],
+def compute_sport_signature(field_map: dict[str, str | int | float | bool | None],
                             salt: str = SPORT_STATIC_SALT) -> str:
     valid_items = []
     for k, v in field_map.items():
@@ -176,14 +174,14 @@ def compute_sport_signature(field_map: Dict[str, Union[str, int, float, bool, No
         if k.lower() == "signature":
             continue
         valid_items.append((k, str(v).lower() if isinstance(v, bool) else str(v)))
-    
+
     valid_items.sort(key=lambda x: (x[0].lower(), x[0]))
     canonical_str = "&".join(f"{k}={v}" for k, v in valid_items)
     to_hash = (canonical_str + salt).encode("utf-8")
-    return hashlib.md5(to_hash).hexdigest().lower()
+    return hashlib.new("md5", to_hash).hexdigest().lower()  # nosemgrep: python.lang.security.insecure-hash-function
 
 
-def compute_original_sign(field_map: Dict[str, Union[str, int, float, bool, None]]) -> str:
+def compute_original_sign(field_map: dict[str, str | int | float | bool | None]) -> str:
     valid_items = []
     for k, v in field_map.items():
         if v is None:
@@ -191,12 +189,12 @@ def compute_original_sign(field_map: Dict[str, Union[str, int, float, bool, None
         if k.lower() == "signature":
             continue
         valid_items.append((k, str(v).lower() if isinstance(v, bool) else str(v)))
-    
+
     valid_items.sort(key=lambda x: x[0])
     return "&".join(f"{k}={v}" for k, v in valid_items)
 
 
-def gzip_base64_encode(data: Union[str, bytes]) -> str:
+def gzip_base64_encode(data: str | bytes) -> str:
     if isinstance(data, str):
         data_bytes = data.encode("utf-8")
     else:
@@ -339,7 +337,7 @@ class GpsPoint:
 class FivePoint:
     def __init__(self, lat: float, lon: float, is_fixed: int = 1,
                  is_pass: bool = True, point_name: str = "", position: int = 0,
-                 glat: Optional[float] = None, glon: Optional[float] = None,
+                 glat: float | None = None, glon: float | None = None,
                  radius: float = 15.0, start_ms: int = 0):
         self.lat = lat
         self.lon = lon
@@ -352,7 +350,7 @@ class FivePoint:
         self.radius = radius
         self.startTime = start_ms
 
-    def _gcj(self) -> Tuple[float, float]:
+    def _gcj(self) -> tuple[float, float]:
         if self.glat is not None and self.glon is not None:
             return self.glat, self.glon
         return wgs84_to_gcj02(self.lat, self.lon)
@@ -392,7 +390,7 @@ class FivePoint:
         }
 
 
-def _largest_remainder(total: int, weights: List[float]) -> List[int]:
+def _largest_remainder(total: int, weights: list[float]) -> list[int]:
     """Split an integer total across buckets so the parts always sum to total."""
     if not weights:
         return []
@@ -409,7 +407,7 @@ def _largest_remainder(total: int, weights: List[float]) -> List[int]:
     return parts
 
 
-def _weighted_split(total: float, weights: List[float]) -> List[float]:
+def _weighted_split(total: float, weights: list[float]) -> list[float]:
     """Split a float total across buckets proportional to weights."""
     if not weights:
         return []
@@ -420,7 +418,7 @@ def _weighted_split(total: float, weights: List[float]) -> List[float]:
     return [total * w / s for w in weights]
 
 
-def _effort_weights(num_buckets: int, rng: random.Random) -> List[float]:
+def _effort_weights(num_buckets: int, rng: random.Random) -> list[float]:
     """Per-10s effort profile: gentle warm-up, steady middle, small kick.
 
     Bucket values are proportional to these weights, so the cadence and speed
@@ -516,7 +514,7 @@ def _poisson(rng: random.Random, lam: float) -> int:
 
 
 def _speed_profile(n: int, base_speed: float, duration_s: float,
-                   rng: random.Random) -> List[float]:
+                   rng: random.Random) -> list[float]:
     """Instantaneous speed (m/s) as a layered, human-like model.
 
     ``base_speed * warm-up * fatigue * recovery * oscillation * AR(1) jitter``
@@ -569,7 +567,7 @@ def _speed_profile(n: int, base_speed: float, duration_s: float,
     return speeds
 
 
-def _sample_deltas(n: int, total_s: float, rng: random.Random) -> List[float]:
+def _sample_deltas(n: int, total_s: float, rng: random.Random) -> list[float]:
     """Sampling intervals (s) summing exactly to total_s.
 
     Real devices keep ~80% of samples on the nominal grid and scatter the rest,
@@ -603,7 +601,7 @@ def _sample_deltas(n: int, total_s: float, rng: random.Random) -> List[float]:
     return deltas
 
 
-def _ensure_cumulative(points: List[GpsPoint], total_distance_m: float,
+def _ensure_cumulative(points: list[GpsPoint], total_distance_m: float,
                        total_steps: int) -> None:
     """Backfill per-point cumulative distance/steps if a caller omitted them."""
     if not points:
@@ -624,10 +622,10 @@ def _ensure_cumulative(points: List[GpsPoint], total_distance_m: float,
         points[-1].cum_steps = float(total_steps)
 
 
-def _ten_sec_windows(points: List[GpsPoint], start_ms: int, total_time: int,
+def _ten_sec_windows(points: list[GpsPoint], start_ms: int, total_time: int,
                      rrid: int = 0, queue_seq: bool = True,
-                     total_steps: Optional[int] = None,
-                     total_distance: Optional[float] = None):
+                     total_steps: int | None = None,
+                     total_distance: float | None = None):
     """Divide the run into 10 s windows using whole-second quota carry.
 
     Returns (speed_windows, step_windows). Distance and steps are accumulated
@@ -689,7 +687,7 @@ def _ten_sec_windows(points: List[GpsPoint], start_ms: int, total_time: int,
     # Realistic pedometer counting noise, deterministic per (start_ms, window) so
     # the record body and the OBS object stay identical.
     for k in range(len(raw_steps)):
-        hv = int.from_bytes(hashlib.md5(f"{start_ms}:{k}".encode()).digest()[:3], "big")
+        hv = int.from_bytes(hashlib.new("md5", f"{start_ms}:{k}".encode()).digest()[:3], "big")  # nosemgrep: python.lang.security.insecure-hash-function
         raw_steps[k] = max(0.0, raw_steps[k] + (hv / 0xFFFFFF - 0.5) * 2.6)
 
     if total_steps is not None and raw_steps and sum(raw_steps) > 0:
@@ -707,7 +705,7 @@ def _ten_sec_windows(points: List[GpsPoint], start_ms: int, total_time: int,
     return speed_windows, step_windows
 
 
-def build_laps(points: List[GpsPoint], start_ms: int) -> List[dict]:
+def build_laps(points: list[GpsPoint], start_ms: int) -> list[dict]:
     """Per-kilometre laps (the app's "每公里数据"), contiguous and exact."""
     laps = []
     if len(points) < 2:
@@ -794,7 +792,7 @@ def build_laps(points: List[GpsPoint], start_ms: int) -> List[dict]:
     return laps
 
 
-def build_obs_payload(gps_points: List[GpsPoint], five_points: Optional[List[FivePoint]], *,
+def build_obs_payload(gps_points: list[GpsPoint], five_points: list[FivePoint] | None, *,
                       uid: int, uuid_str: str, start_time_ms: int, total_time_sec: int,
                       total_distance_m: int, total_steps: int, rrid: int = 0,
                       sport_type: int = 1,
@@ -849,7 +847,7 @@ def build_obs_payload(gps_points: List[GpsPoint], five_points: Optional[List[Fiv
     }
 
 
-def order_points_loop(points_ll: List[Tuple[float, float]]) -> List[Tuple[float, float]]:
+def order_points_loop(points_ll: list[tuple[float, float]]) -> list[tuple[float, float]]:
     """Order (lat, lon) points into a simple loop by bearing around the centroid."""
     if len(points_ll) < 3:
         return list(points_ll)
@@ -939,18 +937,18 @@ def _build_loop_through_points(control_ll, n_per_seg: int = 60):
 def generate_synthetic_gps_track(start_lat: float, start_lon: float,
                                  total_distance_m: int, total_time_sec: int,
                                  start_time_ms: int,
-                                 total_steps: Optional[int] = None,
+                                 total_steps: int | None = None,
                                  weight_kg: float = DEFAULT_BODY_WEIGHT_KG,
                                  height_cm: float = DEFAULT_HEIGHT_CM,
-                                 control_points: Optional[List[Tuple[float, float]]] = None,
-                                 rng: Optional[random.Random] = None
-                                 ) -> Tuple[List[GpsPoint], List[FivePoint]]:
+                                 control_points: list[tuple[float, float]] | None = None,
+                                 rng: random.Random | None = None
+                                 ) -> tuple[list[GpsPoint], list[FivePoint]]:
     start_lat, start_lon = validate_coordinate(start_lat, start_lon)
     if total_distance_m <= 0:
         raise ValueError("total_distance_m must be positive")
     if total_time_sec <= 0:
         raise ValueError("total_time_sec must be positive")
-    rng = rng or random
+    rng = rng if rng is not None else random.Random()
     if total_steps is None:
         total_steps = max(1, int(round(total_distance_m * 1.05)))
 
@@ -961,7 +959,7 @@ def generate_synthetic_gps_track(start_lat: float, start_lon: float,
     if len(deltas) != n - 1:
         deltas = [float(total_time_sec) / (n - 1)] * (n - 1)
 
-    def _cumulate(vs: List[float]) -> List[float]:
+    def _cumulate(vs: list[float]) -> list[float]:
         c = [0.0]
         for i in range(1, n):
             c.append(c[-1] + 0.5 * (vs[i - 1] + vs[i]) * deltas[i - 1])
@@ -1144,7 +1142,7 @@ def validate_outdoor_record_consistency(record: dict,
 
 class IndoorRunRecordBuilder:
     def __init__(self, uid: int, unid: int, sel_min_time: int = 1200, min_steps: int = 2000,
-                 uuid_str: Optional[str] = None):
+                 uuid_str: str | None = None):
         self.uid = uid
         self.unid = unid
         self.sel_min_time = sel_min_time
@@ -1154,10 +1152,10 @@ class IndoorRunRecordBuilder:
     def build_record(self, total_time_sec: int, total_steps: int,
                       start_time_ms: int, stop_time_ms: int,
                       latitude: float = 0.0, longitude: float = 0.0,
-                      step_buckets: Optional[List[StepBucket]] = None,
+                      step_buckets: list[StepBucket] | None = None,
                       calorie: int = 0,
-                      rng: Optional[random.Random] = None) -> Tuple[str, dict, dict]:
-        rng = rng or random
+                      rng: random.Random | None = None) -> tuple[str, dict, dict]:
+        rng = rng if rng is not None else random.Random()
         complete = (total_time_sec >= self.sel_min_time) and (total_steps >= self.min_steps)
         if complete:
             un_complete_reason = 0
@@ -1260,7 +1258,7 @@ class IndoorRunRecordBuilder:
 class OutdoorRunRecordBuilder:
     def __init__(self, uid: int, unid: int, sport_type: int = 1,
                  sel_distance_m: int = 2000, sel_run_time_s: int = 1200,
-                 uuid_str: Optional[str] = None):
+                 uuid_str: str | None = None):
         self.uid = uid
         self.unid = unid
         self.sport_type = sport_type
@@ -1270,18 +1268,18 @@ class OutdoorRunRecordBuilder:
 
     def build_record(self, total_distance_m: int, total_time_sec: int, total_steps: int,
                      start_time_ms: int, stop_time_ms: int,
-                     gps_points: List[GpsPoint],
-                     five_points: Optional[List[FivePoint]] = None,
-                     calorie: Optional[int] = None, avg_power: Optional[int] = None,
-                     total_ascent: Optional[int] = None,
+                     gps_points: list[GpsPoint],
+                     five_points: list[FivePoint] | None = None,
+                     calorie: int | None = None, avg_power: int | None = None,
+                     total_ascent: int | None = None,
                      weight_kg: float = DEFAULT_BODY_WEIGHT_KG,
-                     rng: Optional[random.Random] = None,
+                     rng: random.Random | None = None,
                      policy: int = 1,
-                     sel_distance: Optional[int] = None,
-                     sel_run_time: Optional[int] = None,
+                     sel_distance: int | None = None,
+                     sel_run_time: int | None = None,
                      face_check: int = 0,
                      address: str = "",
-                     room_id: int = 0) -> Tuple[str, dict, dict]:
+                     room_id: int = 0) -> tuple[str, dict, dict]:
         if not gps_points:
             raise ValueError("gps_points cannot be empty")
 
@@ -1291,7 +1289,7 @@ class OutdoorRunRecordBuilder:
         anchor = validate_coordinate(gps_points[0].lat, gps_points[0].lon)
         anchor_lat, anchor_lon = anchor
 
-        rng = rng or random
+        rng = rng if rng is not None else random.Random()
         _ensure_cumulative(gps_points, float(total_distance_m), int(total_steps))
 
         # 10 s windows share the device's whole-second quota-carry semantics, so

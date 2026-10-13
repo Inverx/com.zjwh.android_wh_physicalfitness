@@ -2,9 +2,9 @@ import argparse
 import json
 import time
 
-from whsport.sport_client import SportClient
-from whsport.security_utils import mask_secret, redact_data
 from whsport.credentials import save_credentials
+from whsport.security_utils import mask_secret, redact_data
+from whsport.sport_client import SportClient
 
 
 def print_banner():
@@ -13,7 +13,7 @@ def print_banner():
 
 
 def format_login_success(data: dict):
-    sex = {1: "男", 2: "女"}.get(data.get("sex"), "未设置")
+    sex = {"1": "男", "2": "女"}.get(str(data.get("sex")), "未设置")
     print()
     print("登录成功")
     print(f"姓名: {data.get('name', '未设置')}")

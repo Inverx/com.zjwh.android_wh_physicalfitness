@@ -22,7 +22,7 @@ CRED_PATH = os.path.join(CONFIG_DIR, "credentials.json")
 def load_credentials() -> dict:
     """Return the stored credentials, or an empty dict if none/invalid."""
     try:
-        with open(CRED_PATH, "r", encoding="utf-8") as fh:
+        with open(CRED_PATH, encoding="utf-8") as fh:
             data = json.load(fh)
         return data if isinstance(data, dict) else {}
     except (OSError, json.JSONDecodeError):
@@ -45,10 +45,13 @@ def save_credentials(token=None, uid=None, unid=None, **extra) -> str:
             data[key] = value
     os.makedirs(CONFIG_DIR, mode=0o700, exist_ok=True)
     tmp_path = CRED_PATH + ".tmp"
-    with open(tmp_path, "w", encoding="utf-8") as fh:
-        json.dump(data, fh, ensure_ascii=False, indent=2)
-    os.chmod(tmp_path, 0o600)
-    os.replace(tmp_path, CRED_PATH)
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as fh:
+            json.dump(data, fh, ensure_ascii=False, indent=2)
+        os.chmod(tmp_path, 0o600)
+        os.replace(tmp_path, CRED_PATH)
+    except OSError:
+        return ""
     return CRED_PATH
 
 

@@ -1,9 +1,7 @@
 import asyncio
-from dataclasses import dataclass
 import functools
 import http.server
 import io
-import json
 import logging
 import os
 import random
@@ -12,13 +10,14 @@ import socketserver
 import tempfile
 import threading
 import time
-from typing import Optional, Dict, Any, Tuple
+from dataclasses import dataclass
+from typing import Any
 
 import cv2
 import numpy as np
+import requests
 from PIL import Image
 from playwright.async_api import async_playwright
-import requests
 
 logger = logging.getLogger("geetest_solver")
 
@@ -39,7 +38,7 @@ CHROMIUM_BINARY_CANDIDATES = (
 )
 
 
-def resolve_chromium_executable(explicit: Optional[str] = None) -> Optional[str]:
+def resolve_chromium_executable(explicit: str | None = None) -> str | None:
     """Resolve which Chromium binary to launch.
 
     Priority:
@@ -96,7 +95,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         window.gt4Result = null;
         window.gt4Error = null;
         window.gt4Ready = false;
-        
+
         function initCaptcha(captchaId) {
             initGeetest4({
                 captchaId: captchaId,
@@ -130,7 +129,7 @@ class GeeTestResult:
     gen_time: str
     captcha_output: str
 
-    def to_dict(self) -> Dict[str, str]:
+    def to_dict(self) -> dict[str, str]:
         return {
             "captcha_id": self.captcha_id,
             "lot_number": self.lot_number,
@@ -139,7 +138,7 @@ class GeeTestResult:
             "captcha_output": self.captcha_output,
         }
 
-    def to_app_validate_payload(self, username: str = "", uuid_str: str = "") -> Dict[str, Any]:
+    def to_app_validate_payload(self, username: str = "", uuid_str: str = "") -> dict[str, Any]:
         """Format as payload for POST /api/v70270/security/geevalidate"""
         return {
             "lotNumber": self.lot_number,
@@ -157,7 +156,7 @@ class GeeTestResult:
 class GeeTestV4Solver:
     """Automated solver for GeeTest v4 sliding captcha."""
 
-    def __init__(self, temp_dir: Optional[str] = None, chromium_executable: Optional[str] = None):
+    def __init__(self, temp_dir: str | None = None, chromium_executable: str | None = None):
         if temp_dir is None:
             temp_dir = tempfile.gettempdir()
         self.temp_dir = os.path.abspath(temp_dir)
@@ -170,13 +169,15 @@ class GeeTestV4Solver:
             f.write(HTML_TEMPLATE)
 
     @staticmethod
-    def find_slider_gap(slice_bytes: bytes, bg_bytes: bytes) -> Tuple[int, int, float]:
+    def find_slider_gap(slice_bytes: bytes, bg_bytes: bytes) -> tuple[int, int, float]:
         """Locate exact cutout position using OpenCV Canny edge template matching with alpha mask."""
         bg_arr = np.frombuffer(bg_bytes, np.uint8)
         slice_arr = np.frombuffer(slice_bytes, np.uint8)
 
         bg = cv2.imdecode(bg_arr, cv2.IMREAD_COLOR)
         slice_img = cv2.imdecode(slice_arr, cv2.IMREAD_UNCHANGED)
+        if bg is None or slice_img is None:
+            raise ValueError("failed to decode captcha image")
 
         slice_alpha = slice_img[:, :, 3]
         slice_bgr = slice_img[:, :, :3]
@@ -193,6 +194,8 @@ class GeeTestV4Solver:
         slice_edge = cv2.Canny(crop_slice_gray, 100, 200)
 
         res = cv2.matchTemplate(bg_edge, slice_edge, cv2.TM_CCORR_NORMED)
+        if res is None:
+            raise ValueError("captcha template matching failed")
         _, max_val, _, max_loc = cv2.minMaxLoc(res)
 
         distance = max_loc[0] - xmin
@@ -230,7 +233,7 @@ class GeeTestV4Solver:
 
         return track
 
-    async def _solve_once(self, captcha_id: str, proxy: Optional[str] = None, timeout: float = 20.0) -> Optional[GeeTestResult]:
+    async def _solve_once(self, captcha_id: str, proxy: str | None = None, timeout: float = 20.0) -> GeeTestResult | None:
         handler = functools.partial(QuietHTTPRequestHandler, directory=self.temp_dir)
         httpd = socketserver.TCPServer(("127.0.0.1", 0), handler)
         port = httpd.server_address[1]
@@ -276,7 +279,13 @@ class GeeTestV4Solver:
                 await asyncio.sleep(2.0)
 
                 btn = await page.wait_for_selector(".geetest_btn", timeout=5000)
+                if btn is None:
+                    await browser.close()
+                    return None
                 btn_box = await btn.bounding_box()
+                if btn_box is None:
+                    await browser.close()
+                    return None
 
                 dom_info = await page.evaluate("""() => {
                     function cleanUrl(bg) {
@@ -298,8 +307,8 @@ class GeeTestV4Solver:
                     };
                 }""")
 
-                bg_bytes = requests.get(dom_info["bgUrl"]).content
-                slice_bytes = requests.get(dom_info["sliceUrl"]).content
+                bg_bytes = requests.get(dom_info["bgUrl"], timeout=20).content
+                slice_bytes = requests.get(dom_info["sliceUrl"], timeout=20).content
 
                 bg_img = Image.open(io.BytesIO(bg_bytes))
                 scale = dom_info["bgRect"]["width"] / bg_img.size[0]
@@ -351,10 +360,10 @@ class GeeTestV4Solver:
 
         return result
 
-    def solve(self, captcha_id: str = GEETEST_IDS["LOGIN"], proxy: Optional[str] = None, max_retries: int = 3, timeout_per_try: float = 20.0) -> GeeTestResult:
+    def solve(self, captcha_id: str = GEETEST_IDS["LOGIN"], proxy: str | None = None, max_retries: int = 3, timeout_per_try: float = 20.0) -> GeeTestResult:
         """Solve GeeTest v4 captcha synchronously with automatic retry."""
         last_err = None
-        for attempt in range(1, max_retries + 1):
+        for _attempt in range(1, max_retries + 1):
             try:
                 result = asyncio.run(self._solve_once(captcha_id, proxy=proxy, timeout=timeout_per_try))
                 if result is not None:

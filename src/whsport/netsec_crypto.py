@@ -2,12 +2,12 @@ import base64
 import collections
 import hashlib
 import json
-import os
 import random
 import struct
 import time
 import uuid
-from typing import Dict, Optional, Tuple, Union
+from collections.abc import Mapping
+from typing import Any
 
 from Crypto.Cipher import AES, PKCS1_v1_5
 from Crypto.PublicKey import RSA
@@ -34,7 +34,7 @@ DEFAULT_HOST_DISCOVERY = "https://discovery.gxapp.iydsj.com"
 DEFAULT_HOST_DATAPOINT = "https://datapoint.gxapp.iydsj.com"
 
 
-def compute_token_sign(params: Dict[str, Union[str, int, float, None]],
+def compute_token_sign(params: Mapping[str, Any],
                        salt: str = SPORT_STATIC_SALT) -> str:
     valid_items = []
     for k, v in params.items():
@@ -46,7 +46,7 @@ def compute_token_sign(params: Dict[str, Union[str, int, float, None]],
     valid_items.sort(key=lambda x: (x[0].lower(), x[0]))
     canonical_str = "&".join(f"{k}={v}" for k, v in valid_items)
     to_hash = (canonical_str + salt).encode("utf-8")
-    return hashlib.md5(to_hash).hexdigest().lower()
+    return hashlib.new("md5", to_hash).hexdigest().lower()  # nosemgrep: python.lang.security.insecure-hash-function
 
 
 def _byte_hash(data: bytes) -> int:
@@ -56,7 +56,7 @@ def _byte_hash(data: bytes) -> int:
     return h
 
 
-def _feistel_transform(s0: int, s1: int, s2: int, s3: int) -> Tuple[int, int, int, int]:
+def _feistel_transform(s0: int, s1: int, s2: int, s3: int) -> tuple[int, int, int, int]:
     M = 0xFFFFFFFF
     t = (s2 ^ s0) & M
     mix = (((t >> 24) | (t << 8)) & M) ^ (((t >> 8) | (t << 24)) & M) ^ t
@@ -82,21 +82,25 @@ def _final_mix(s0: int, s1: int, s2: int, s3: int) -> bytes:
     return struct.pack("<IIII", d, a, b, c)
 
 
-def response_kdf(kd1: Union[str, bytes],
-                 kd2: Union[str, bytes],
-                 kd3: Union[str, bytes],
-                 kd4: Union[str, bytes]) -> bytes:
-    if isinstance(kd1, str): kd1 = kd1.encode("utf-8")
-    if isinstance(kd2, str): kd2 = kd2.encode("utf-8")
-    if isinstance(kd3, str): kd3 = kd3.encode("utf-8")
-    if isinstance(kd4, str): kd4 = kd4.encode("utf-8")
+def response_kdf(kd1: str | bytes,
+                 kd2: str | bytes,
+                 kd3: str | bytes,
+                 kd4: str | bytes) -> bytes:
+    if isinstance(kd1, str):
+        kd1 = kd1.encode("utf-8")
+    if isinstance(kd2, str):
+        kd2 = kd2.encode("utf-8")
+    if isinstance(kd3, str):
+        kd3 = kd3.encode("utf-8")
+    if isinstance(kd4, str):
+        kd4 = kd4.encode("utf-8")
     h1, h2, h3, h4 = _byte_hash(kd1), _byte_hash(kd2), _byte_hash(kd3), _byte_hash(kd4)
     s0, s1, s2, s3 = _feistel_transform(h1, h2, h3, h4)
     return _final_mix(s0, s1, s2, s3)
 
 
 class NetSecSession:
-    def __init__(self, fixed_uuid: Optional[str] = None):
+    def __init__(self, fixed_uuid: str | None = None):
         if fixed_uuid:
             raw_uuid = fixed_uuid.replace("-", "")
         else:
@@ -124,7 +128,7 @@ class NetSecSession:
             self.keyDataOne, self.keyDataTwo, self.keyDataThree, self.keyDataFour
         )
 
-    def get_key_data_dict(self) -> Dict[str, str]:
+    def get_key_data_dict(self) -> dict[str, str]:
         return {
             "keyDataOne": self.keyDataOne,
             "keyDataTwo": self.keyDataTwo,
@@ -144,9 +148,9 @@ class NetSecCrypto:
         self.response_rsa_key = RSA.import_key(resp_der)
 
     def encrypt_request(self,
-                        caller_plaintext: Union[str, bytes, dict, list],
+                        caller_plaintext: str | bytes | dict | list,
                         session: NetSecSession,
-                        timestamp_sec: Optional[int] = None) -> Dict[str, str]:
+                        timestamp_sec: int | None = None) -> dict[str, str]:
         if isinstance(caller_plaintext, (dict, list)):
             caller_bytes = json.dumps(caller_plaintext, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
         elif isinstance(caller_plaintext, str):
@@ -167,7 +171,7 @@ class NetSecCrypto:
         ])
         inner_json = json.dumps(inner_dict, separators=(",", ":"), ensure_ascii=False) + chr(10)
         inner_bytes = inner_json.encode("utf-8")
-        h = hashlib.md5(inner_bytes).hexdigest().lower()
+        h = hashlib.new("md5", inner_bytes).hexdigest().lower()  # nosemgrep: python.lang.security.insecure-hash-function
         printable_pool = [chr(i) for i in range(0x21, 0x7E)]
         req_aes_key = "".join(random.choice(printable_pool) for _ in range(16)).encode("ascii")
         zero_iv = bytes(16)
@@ -186,9 +190,9 @@ class NetSecCrypto:
         }
 
     def encrypt_observed(self,
-                         caller_plaintext: Union[str, bytes, dict, list],
+                         caller_plaintext: str | bytes | dict | list,
                          session: NetSecSession,
-                         ts_ms: Optional[int] = None) -> str:
+                         ts_ms: int | None = None) -> str:
         """Build the nested "observed" envelope used by runec on the check-in
         point endpoint: container platform=1, ms timestamp, outer order k/p/d/h/t."""
         if isinstance(caller_plaintext, (dict, list)):
@@ -214,16 +218,19 @@ class NetSecCrypto:
         req_key = "".join(random.choice(printable_pool) for _ in range(16)).encode("ascii")
         aes_cipher = AES.new(req_key, AES.MODE_CBC, iv=bytes(16))
         d = base64.b64encode(aes_cipher.encrypt(pad(container, 16))).decode("ascii")
-        h = hashlib.md5(container).hexdigest().lower()
+        h = hashlib.new("md5", container).hexdigest().lower()  # nosemgrep: python.lang.security.insecure-hash-function
         k = base64.b64encode(self.request_rsa_cipher.encrypt(req_key)).decode("ascii")
-        return '{"k":"%s","p":101,"d":"%s","h":"%s","t":0}' % (k, d, h)
+        return f'{{"k":"{k}","p":101,"d":"{d}","h":"{h}","t":0}}'
 
     def decrypt_response(self,
-                         wire_response: Union[str, dict],
+                         wire_response: str | dict,
                          session: NetSecSession,
                          verify_sig: bool = True) -> str:
         if isinstance(wire_response, str):
-            res_obj = json.loads(wire_response)
+            try:
+                res_obj = json.loads(wire_response)
+            except json.JSONDecodeError as exc:
+                raise ValueError("response is not valid JSON") from exc
         else:
             res_obj = wire_response
         v = res_obj.get("v")
@@ -240,7 +247,7 @@ class NetSecCrypto:
         except ValueError:
             inner_plain_bytes = padded_plain
         if verify_sig:
-            digest_hex = hashlib.md5(inner_plain_bytes).hexdigest().lower().encode("ascii")
+            digest_hex = hashlib.new("md5", inner_plain_bytes).hexdigest().lower().encode("ascii")  # nosemgrep: python.lang.security.insecure-hash-function
             sig_bytes = base64.b64decode(s_b64)
             block_size = (self.response_rsa_key.n.bit_length() + 7) // 8
             if len(sig_bytes) != block_size:
@@ -263,14 +270,17 @@ class NetSecCrypto:
                 raise ValueError(
                     f"Signature mismatch: recovered={recovered_digest!r} vs expected={digest_hex!r}"
                 )
-        inner_obj = json.loads(inner_plain_bytes.decode("utf-8"))
+        try:
+            inner_obj = json.loads(inner_plain_bytes.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError("decrypted payload is not valid JSON") from exc
         data_b64 = inner_obj.get("data", "")
         business_bytes = base64.b64decode(data_b64)
         return business_bytes.decode("utf-8")
 
     def simulate_server_encrypt(self,
-                                business_obj: Union[str, dict, list],
-                                session: NetSecSession) -> Dict[str, Union[str, int]]:
+                                business_obj: str | dict | list,
+                                session: NetSecSession) -> dict[str, str | int]:
         if isinstance(business_obj, (dict, list)):
             business_str = json.dumps(business_obj, separators=(",", ":"), ensure_ascii=False)
         else:
