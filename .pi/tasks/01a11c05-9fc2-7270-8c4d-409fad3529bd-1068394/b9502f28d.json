@@ -1,0 +1,25 @@
+{
+  "id": "b9502f28d",
+  "name": "Build EUI-NEO GUI",
+  "command": "cd /home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui && cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DWITH_UDA=OFF && cmake --build build --parallel 2>&1 | tail -60",
+  "status": "running",
+  "outputPath": ".pi/tasks/01a11c05-9fc2-7270-8c4d-409fad3529bd-1068394/b9502f28d.output",
+  "cwd": "/home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40",
+  "startTime": 1791900146197,
+  "pid": 1160487,
+  "bytesWritten": 0,
+  "isAgent": false,
+  "surviveReload": false,
+  "notified": false,
+  "notifyOnCompletion": true,
+  "triggerOnCompletion": true,
+  "timeoutSeconds": 1800,
+  "shellPolicy": {
+    "policy": "inherit",
+    "executable": "/bin/zsh",
+    "argvPrefix": [
+      "-c"
+    ],
+    "dialect": "posix"
+  }
+}

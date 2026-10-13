@@ -25,7 +25,6 @@ wh-score = "whsport.cli.score_cli:main"
 wh-policy = "whsport.cli.policy_cli:main"
 wh-history = "whsport.cli.history_cli:main"
 wh-rank = "whsport.cli.rank_cli:main"
-wh-gui = "whsport.gui:main"
 wh-rpc = "whsport.rpc:main"
 
 [build-system]

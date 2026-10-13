@@ -1,0 +1,26 @@
+-- The C compiler identification is GNU 16.2.1
+-- The CXX compiler identification is GNU 16.2.1
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Using the multi-header code from /home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui/build/_deps/json-src/include/
+-- EUI render backend: requested=opengl, resolved=opengl
+-- Using package GLFW target: glfw
+-- Using bundled glad source: /home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui/build/_deps/eui-neo-src/3rd/glad
+-- Using bundled tray source: /home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui/build/_deps/eui-neo-src/3rd/tray
+-- Using bundled FreeType source: /home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui/build/_deps/eui-neo-src/3rd/freetype
+-- Using bundled zlib source: /home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui/build/_deps/eui-neo-src/3rd/zlib-1.3.1
+-- Using bundled libpng source: /home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui/build/_deps/eui-neo-src/3rd/libpng-1.6.43
+-- Using bundled MD4C source: /home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui/build/_deps/eui-neo-src/3rd/md4c
+-- Found Threads: TRUE
+-- Found CURL: /usr/lib/libcurl.so (found version "8.22.0")
+-- Configuring done (23.5s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/ation_ciger/Tools/com.zjwh.android_wh_physicalfitness-V7.3.40/gui/build

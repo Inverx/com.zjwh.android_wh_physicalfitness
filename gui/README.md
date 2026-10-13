@@ -3,7 +3,7 @@
 跨三平台（Windows / Linux / macOS）桌面前端。**UI 用 EUI-NEO（C++17），业务逻辑仍走 Python 引擎**，
 两者通过 stdin/stdout 上的 **JSON-RPC** 通信（见 `../src/whsport/rpc.py`）。
 
-```
+```text
 ┌────────────────────────┐   一行一个 JSON     ┌──────────────────────────┐
 │ whsport_gui (EUI-NEO)  │ ─────────────────▶ │ whsport-engine (Python)   │
 │  登录 / 跑步 / 查询      │ ◀───────────────── │  协议/加密/轨迹生成        │
@@ -22,6 +22,16 @@
 2. 环境变量 `WHS_PYTHON` → 用该解释器跑 `-m whsport rpc`
 3. 依次尝试 `whsport-engine`（冻结产物）、`python3`
 
+### 本地调试（不打包，直接用 uv 跑引擎）
+
+```bash
+# 终端 A：启动引擎（uv 环境）
+uv run python -m whsport rpc
+
+# 终端 B：让 GUI 用 uv 的解释器启动引擎
+WHS_PYTHON="$(uv run python -c 'import sys;print(sys.executable)')" ./build/whsport_gui
+```
+
 ## 构建
 
 需要 CMake ≥ 3.16、C++17 编译器；依赖（EUI-NEO、nlohmann/json）由 `FetchContent` 自动拉取。
@@ -35,7 +45,7 @@ cmake --build build --parallel
 ### 平台系统依赖
 
 | 平台 | 需要 |
-|---|---|
+| --- | --- |
 | Linux | `xorg-dev libgl1-mesa-dev libglu1-mesa-dev libwayland-dev libxkbcommon-dev`（托盘还需 GLib/GIO） |
 | macOS | `brew install glfw` |
 | Windows | MSVC 2019+ / MinGW-w64；用 vcpkg 或 CMake 自动拉取依赖 |
