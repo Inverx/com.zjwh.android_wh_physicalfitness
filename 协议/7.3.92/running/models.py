@@ -48,15 +48,32 @@ class FivePoint:
 @dataclass
 class StepBucket:
     """10秒步频分桶统计"""
-    stepsNum: int
-    beginTime: int
-    endTime: int
+    stepsNum: int = 0
+    beginTime: int = 0
+    endTime: int = 0
     flag: int = 0
     maxDiff: float = 0.0
     minDiff: float = 0.0
     avgDiff: float = 0.0
     state: int = 0
     queueNum: int = 1
+
+    def __init__(self, stepsNum: int = 0, beginTime: int = 0, endTime: int = 0,
+                 flag: int = 0, maxDiff: float = 0.0, minDiff: float = 0.0,
+                 avgDiff: float = 0.0, state: int = 0, queueNum: int = 1,
+                 steps_num: Optional[int] = None, begin_time: Optional[int] = None,
+                 end_time: Optional[int] = None, max_diff: Optional[float] = None,
+                 min_diff: Optional[float] = None, avg_diff: Optional[float] = None,
+                 queue_num: Optional[int] = None):
+        self.stepsNum = steps_num if steps_num is not None else stepsNum
+        self.beginTime = begin_time if begin_time is not None else beginTime
+        self.endTime = end_time if end_time is not None else endTime
+        self.flag = flag
+        self.maxDiff = max_diff if max_diff is not None else maxDiff
+        self.minDiff = min_diff if min_diff is not None else minDiff
+        self.avgDiff = avg_diff if avg_diff is not None else avgDiff
+        self.state = state
+        self.queueNum = queue_num if queue_num is not None else queueNum
 
     def to_dict(self) -> dict:
         return {
@@ -75,12 +92,23 @@ class StepBucket:
 @dataclass
 class SpeedBucket:
     """10秒速度分桶统计"""
-    distance: float
-    beginTime: int
-    endTime: int
+    distance: float = 0.0
+    beginTime: int = 0
+    endTime: int = 0
     flag: int = 0
     state: int = 0
     queueNum: int = 1
+
+    def __init__(self, distance: float = 0.0, beginTime: int = 0, endTime: int = 0,
+                 flag: int = 0, state: int = 0, queueNum: int = 1,
+                 begin_time: Optional[int] = None, end_time: Optional[int] = None,
+                 queue_num: Optional[int] = None):
+        self.distance = distance
+        self.beginTime = begin_time if begin_time is not None else beginTime
+        self.endTime = end_time if end_time is not None else endTime
+        self.flag = flag
+        self.state = state
+        self.queueNum = queue_num if queue_num is not None else queueNum
 
     def to_dict(self) -> dict:
         return {
