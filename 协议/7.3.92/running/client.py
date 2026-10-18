@@ -104,9 +104,9 @@ class RunningClient(BaseNetSecClient):
             return RunningSubmissionResult(success=False, message="缺少鉴权凭据 (uid/token)")
 
         # 1. 冷启动时间校准与行为埋点
-        log("[1/6] 服务端 GMT 时间校准与冷启动埋点上报...")
         st1 = self.profile.get_server_time()
         t_now_ms = st1.server_timestamp_ms
+        log(f"时钟校准: 成功 时间戳={t_now_ms} 偏斜={st1.offset_seconds:+.3f}s")
         if self.unid:
             self.telemetry.send_startup_pv(uid=int(self.uid), unid=int(self.unid))
             self.telemetry.send_page_exposure(unid=int(self.unid))
@@ -121,9 +121,9 @@ class RunningClient(BaseNetSecClient):
             if f.polygon_points:
                 center_lat = f.polygon_points[0].lat
                 center_lng = f.polygon_points[0].lng
-            log(f"    -> 成功关联围栏: {f.fence_name} (包含 {len(checkpoints)} 个目标打卡点)")
+            log(f"围栏关联: 成功 名称={f.fence_name} 点数={len(checkpoints)}")
         else:
-            log("    [!] 未查询到专属围栏，启用运动学环形合规轨迹兜底")
+            log("围栏关联: 未命中 策略=环形合规兜底")
 
         # 3. 拟人运动学轨迹生成
         stop_time_ms = t_now_ms
@@ -154,10 +154,10 @@ class RunningClient(BaseNetSecClient):
         log(f"轨迹合成: 成功 距离={target_distance_m}m 耗时={target_time_sec}s 点数={len(gps_pts)} 步数={total_steps} 配速={save_record["speed"]}")
 
         # 4. 华为云 OBS 预签名上传
-        log("[4/6] 申请 OBS 异步大对象存储地址并上传轨迹数据...")
         obs_res = self.request_obs_upload_url(object_key=obj_key)
         if obs_res.get("error") != 10000 or not obs_res.get("data"):
-            err = obs_res.get("message", "OBS 凭证申请失败")
+            err = obs_res.get("message", "OBS凭证申请失败")
+            log(f"OBS上传: 失败 原因={err}")
             return RunningSubmissionResult(success=False, message=f"申请 OBS 上传凭证失败: {err}", raw=obs_res)
 
         obs_info = obs_res["data"]
@@ -165,20 +165,22 @@ class RunningClient(BaseNetSecClient):
         signed_headers = obs_info.get("actualSignedRequestHeaders") or {"Content-Type": "text/plain"}
         put_res = self.upload_to_obs(signed_url, signed_headers, obs_payload)
         if put_res.get("error") != 10000:
-            return RunningSubmissionResult(success=False, message=f"推送到 OBS 失败: {put_res.get("message")}", raw=put_res)
-        log("    -> OBS 轨迹点阵推送完成 SUCCESS!")
+            err = put_res.get("message", "推送失败")
+            log(f"OBS上传: 失败 原因={err}")
+            return RunningSubmissionResult(success=False, message=f"推送到 OBS 失败: {err}", raw=put_res)
+        log("OBS上传: 成功 状态=已同步")
 
         # 5. 核心跑步结算上报 (save/record)
-        log("[5/6] 提交最终跑步成绩结算 (/api/v70260/runnings/save/record)...")
         sub_res = self.submit_record(save_record)
         if not isinstance(sub_res, dict) or sub_res.get("error") != 10000:
             code = sub_res.get("error", -1) if isinstance(sub_res, dict) else -1
             msg = sub_res.get("message", "结算上报失败") if isinstance(sub_res, dict) else str(sub_res)
+            log(f"成绩结算: 失败 code={code} 原因={msg}")
             return RunningSubmissionResult(success=False, error_code=code, message=msg, raw=sub_res)
 
         data = sub_res.get("data") or {}
         rrid = data.get("rrid") or data.get("id")
-        log(f"    -> 成绩结算成功！获得运动流水号 RRID={rrid}")
+        log(f"成绩结算: 成功 rrid={rrid}")
 
         # 6. 跑后实时成绩与状态回查
         time.sleep(0.5)
@@ -190,7 +192,7 @@ class RunningClient(BaseNetSecClient):
         if self.unid:
             self.telemetry.send_page_exposure(unid=int(self.unid))
 
-        log(f"    -> 最终判定结果: {"达标通过 PASS" if is_valid else "未达标"}")
+        log(f"判定结果: {"达标" if is_valid else "未达标"}")
         return RunningSubmissionResult(
             success=True,
             rrid=rrid,
