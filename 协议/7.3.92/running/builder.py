@@ -208,8 +208,8 @@ class RunningTrackBuilder:
         for i in range(num_buckets):
             b_start = start_time_ms + i * 10000
             b_end = min(stop_time_ms, b_start + 10000)
-            speed_buckets.append(SpeedBucket(dist_per_bucket, b_start, b_end, queue_num=i + 1))
-            step_buckets.append(StepBucket(steps_per_bucket, b_start, b_end, queue_num=i + 1))
+            speed_buckets.append(SpeedBucket(dist_per_bucket, b_start, b_end, queueNum=i + 1))
+            step_buckets.append(StepBucket(steps_per_bucket, b_start, b_end, queueNum=i + 1))
 
         all_loc_json = json.dumps([p.to_dict() for p in gps_points], separators=(",", ":"))
         five_pt_json = json.dumps([p.to_dict() for p in five_points], separators=(",", ":")) if five_points else "[]"
