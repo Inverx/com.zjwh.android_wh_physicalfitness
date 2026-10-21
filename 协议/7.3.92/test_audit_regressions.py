@@ -111,6 +111,16 @@ class ValidationTests(OfflineTest):
         with self.assertRaises(ValueError):
             RunningTrackBuilder(1, 2).generate_track_around_points(30, 120)
 
+    def test_selected_duration_is_not_interpreted_as_school_minimum(self):
+        builder = RunningTrackBuilder(1, 2, sport_type=6)
+        points, fixed = builder.generate_track_around_points(
+            30, 120, total_time_sec=760, start_time_ms=0)
+        body, _, _ = builder.build_submission_payload(
+            2100, 760, 2917, 0, 760000, points, fixed, sel_run_time_s=1200)
+        self.assertEqual(body['totalTime'], 760)
+        self.assertEqual(body['selRunTime'], 1200)
+        self.assertTrue(body['complete'])
+
     def test_empty_track_rejected(self):
         with self.assertRaises(ValueError):
             RunningTrackBuilder(1, 2).build_submission_payload(2000, 1200, 2000, 0, 1200000, [], [])
@@ -157,12 +167,29 @@ class ClientTests(OfflineTest):
                 client.upload_to_obs.assert_not_called()
                 client.submit_record.assert_not_called()
 
-    def test_short_or_invalid_run_stops_before_upload(self):
-        for seconds in (-1, 0, 760):
+    def test_invalid_run_stops_before_upload(self):
+        for seconds in (-1, 0):
             with self.subTest(seconds=seconds):
                 client = self.run_client()
                 self.assertFalse(self.execute(client, target_time_sec=seconds).success)
                 client.upload_to_obs.assert_not_called()
+
+    def test_760_second_run_preserves_duration_without_local_minimum(self):
+        client = self.run_client()
+        result = self.execute(client, target_time_sec=760)
+        self.assertTrue(result.success)
+        body = client.submit_record.call_args.args[0]
+        self.assertEqual(body['totalTime'], 760)
+        self.assertEqual(body['selRunTime'], 760)
+        self.assertEqual(body['stopTime'] - body['startTime'], 760000)
+        self.assertTrue(body['complete'])
+
+    def test_distance_below_school_minimum_still_stops_before_upload(self):
+        client = self.run_client()
+        result = self.execute(client, target_distance_m=1999, target_time_sec=760)
+        self.assertFalse(result.success)
+        self.assertIn('2000', result.message)
+        client.upload_to_obs.assert_not_called()
 
     def test_required_face_verification_stops_submission(self):
         client = self.run_client()

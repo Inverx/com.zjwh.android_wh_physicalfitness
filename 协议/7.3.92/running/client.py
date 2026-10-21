@@ -94,7 +94,7 @@ class RunningClient(BaseNetSecClient):
 
     def execute_full_run(self,
                          target_distance_m: int = 2100,
-                         target_time_sec: int = 1200,
+                         target_time_sec: int = 760,
                          sport_type: int = 1,
                          progress_callback: Optional[Callable[[str], None]] = None) -> RunningSubmissionResult:
         """按照 7.3.92 实机抓包全时序规范执行拟人跑步结算全流程"""
@@ -126,10 +126,9 @@ class RunningClient(BaseNetSecClient):
         rule = self.policy.get_run_policy(run_mode=sport_type)
         if not rule or rule.min_distance <= 0:
             return RunningSubmissionResult(success=False, message="未取得有效跑步规则，停止提交")
-        # The existing protocol uses a local 1200-second minimum. Do not silently
-        # lower it to the caller's requested duration or claim it is a school rule.
-        if target_distance_m < rule.min_distance or target_time_sec < 1200:
-            return RunningSubmissionResult(success=False, message="距离低于学校规则或时长低于本地1200秒下限")
+        if target_distance_m < rule.min_distance:
+            return RunningSubmissionResult(success=False,
+                                           message=f"距离低于学校最低里程 {rule.min_distance} 米")
         if rule.face_check.enable:
             return RunningSubmissionResult(success=False, message="当前流程不支持所需的人脸核验，停止提交")
         fences = self.policy.get_geo_fence()
@@ -175,7 +174,7 @@ class RunningClient(BaseNetSecClient):
             gps_points=gps_pts,
             five_points=five_pts,
             sel_distance_m=rule.min_distance,
-            sel_run_time_s=1200
+            sel_run_time_s=target_time_sec
         )
         log(f"轨迹合成: 成功 距离={target_distance_m}m 耗时={target_time_sec}s 点数={len(gps_pts)} 步数={total_steps} 配速={save_record['speed']}")
 

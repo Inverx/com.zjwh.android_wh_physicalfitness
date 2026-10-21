@@ -125,7 +125,7 @@ class SportClient792:
     # 4. 跑步提交子系统 (支持 sport_type=1 计分跑 与 sport_type=6 自由跑)
     def execute_run(self,
                     target_distance_m: int = 2150,
-                    target_time_sec: int = 1200,
+                    target_time_sec: int = 760,
                     sport_type: int = 1,
                     progress_callback: Optional[Callable[[str], None]] = None) -> RunningSubmissionResult:
         """

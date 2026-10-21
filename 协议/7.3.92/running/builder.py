@@ -147,12 +147,14 @@ class RunningTrackBuilder:
                                 gps_points: List[GpsPoint],
                                 five_points: List[FivePoint],
                                 sel_distance_m: int = 2000,
-                                sel_run_time_s: int = 1200,
+                                sel_run_time_s: Optional[int] = None,
                                 calorie: int = 135,
                                 avg_power: int = 150) -> Tuple[dict, dict, str]:
         """组装完整的 save/record 报文、OBS 上传大对象与相对路径"""
         validate_run(total_time_sec, total_steps, start_time_ms, stop_time_ms,
                      total_distance_m)
+        if sel_run_time_s is None:
+            sel_run_time_s = total_time_sec
         if (not gps_points or sel_distance_m <= 0 or sel_run_time_s <= 0
                 or calorie < 0 or avg_power < 0):
             raise ValueError("track, positive thresholds and nonnegative energy are required")
@@ -167,7 +169,9 @@ class RunningTrackBuilder:
             raise ValueError("track timestamps must increase")
         if self.sport_type == 1 and not five_points:
             raise ValueError("required checkpoints are unavailable")
-        complete = (total_distance_m >= sel_distance_m) and (total_time_sec >= sel_run_time_s)
+        # selRunTime is a selected payload value, not a verified school minimum.
+        # This local flag does not replace the server's record-validity verdict.
+        complete = total_distance_m >= sel_distance_m
         un_complete_reason = 0 if complete else 10
         avg_step_freq = round(total_steps * 60.0 / total_time_sec) if total_time_sec > 0 else 165
         speed_val = round((total_distance_m / total_time_sec) * 1000) if total_time_sec > 0 else 2600

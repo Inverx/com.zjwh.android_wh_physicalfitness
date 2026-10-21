@@ -32,7 +32,7 @@ def main():
     parser.add_argument("--run", action="store_true", help="触发一键全时序跑步与结算")
     parser.add_argument("--mode", type=int, default=1, choices=[1, 6], help="运动类型: 1计分跑 6自由跑")
     parser.add_argument("--distance", type=int, default=2150, help="跑步目标距离 (米，默认 2150)")
-    parser.add_argument("--time-sec", type=int, default=1200, help="跑步耗时 (秒，默认 1200)")
+    parser.add_argument("--time-sec", type=int, default=760, help="跑步耗时 (秒，默认 760)")
 
     # 广告相关选项
     parser.add_argument("--watch-ad", action="store_true", help="模拟看广告与激励视频曝光链路")

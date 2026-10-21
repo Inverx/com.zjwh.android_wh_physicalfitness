@@ -21,7 +21,7 @@ def main():
     parser.add_argument("-u", "--uid", required=True, help="用户 UID")
     parser.add_argument("--unid", help="学校 UNID")
     parser.add_argument("-d", "--distance", type=int, default=2150, help="跑步目标距离 (米)")
-    parser.add_argument("-s", "--seconds", type=int, default=1200, help="跑步总耗时 (秒)")
+    parser.add_argument("-s", "--seconds", type=int, default=760, help="跑步总耗时 (秒)")
     parser.add_argument("-m", "--mode", type=int, default=1, choices=[1, 6], help="运动类型: 1计分跑 6自由跑")
     args = parser.parse_args()
 
