@@ -3,7 +3,7 @@ import collections
 import hashlib
 import json
 import os
-import random
+import secrets
 import struct
 import subprocess
 import time
@@ -148,6 +148,10 @@ def aes128_cbc_encrypt(data: bytes, key: bytes, iv: bytes = bytes(16)) -> bytes:
     return bytes(out)
 
 def aes128_cbc_decrypt(data: bytes, key: bytes, iv: bytes = bytes(16)) -> bytes:
+    if not data or len(data) % 16:
+        raise ValueError("AES-CBC ciphertext must contain complete blocks")
+    if len(key) != 16 or len(iv) != 16:
+        raise ValueError("AES-128-CBC requires a 16-byte key and IV")
     round_keys = key_expansion_128(key)
     out = bytearray()
     prev = iv
@@ -158,9 +162,9 @@ def aes128_cbc_decrypt(data: bytes, key: bytes, iv: bytes = bytes(16)) -> bytes:
         out.extend(plain)
         prev = block
     pad_len = out[-1]
-    if 1 <= pad_len <= 16:
-        return bytes(out[:-pad_len])
-    return bytes(out)
+    if not 1 <= pad_len <= 16 or out[-pad_len:] != bytes([pad_len]) * pad_len:
+        raise ValueError("Invalid PKCS#7 padding")
+    return bytes(out[:-pad_len])
 
 def rsa_pkcs1_v15_encrypt(msg: bytes, n: int, e: int, k_len: int = 128) -> bytes:
     ps_len = k_len - len(msg) - 3
@@ -254,7 +258,7 @@ class NetSecClient:
         inner_bytes = inner_json.encode("utf-8")
         h = hashlib.md5(inner_bytes).hexdigest().lower()
 
-        req_aes_key = "".join(random.choice("abcdefghijklmnopqrstuvwxyz0123456789") for _ in range(16)).encode("ascii")
+        req_aes_key = "".join(secrets.choice("abcdefghijklmnopqrstuvwxyz0123456789") for _ in range(16)).encode("ascii")
         ciphertext = aes128_cbc_encrypt(inner_bytes, req_aes_key)
         d = base64.b64encode(ciphertext).decode("ascii")
         enc_k = rsa_pkcs1_v15_encrypt(req_aes_key, self.n, self.e)

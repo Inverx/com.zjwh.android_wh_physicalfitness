@@ -5,6 +5,7 @@ import time
 import urllib.request
 from typing import Optional, Dict, Any, List, Union
 
+from core.security import open_https
 from core.config import DEFAULT_DEVICE_CONFIG, load_customer_device
 from .config import (
     URL_STARTUP_PV,
@@ -39,7 +40,7 @@ class TelemetryClient:
         data_bytes = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
         req = urllib.request.Request(url, data=data_bytes, headers=headers, method="POST")
         try:
-            with urllib.request.urlopen(req, context=self.ssl_ctx, timeout=10) as resp:
+            with open_https(req, context=self.ssl_ctx, timeout=10) as resp:
                 return json.loads(resp.read().decode("utf-8"))
         except Exception as e:
             return {"error": -1, "message": str(e)}
@@ -84,7 +85,7 @@ class TelemetryClient:
         """心跳与控制信令检查 (control.gxapp.iydsj.com/getMessage)"""
         req = urllib.request.Request(URL_CONTROL_MESSAGE, headers={"User-Agent": "okhttp/4.12.0"}, method="GET")
         try:
-            with urllib.request.urlopen(req, context=self.ssl_ctx, timeout=5) as resp:
+            with open_https(req, context=self.ssl_ctx, timeout=5) as resp:
                 return {"status": resp.status, "body": resp.read().decode("utf-8", errors="ignore")}
         except Exception as e:
             return {"error": -1, "message": str(e)}

@@ -7,6 +7,7 @@ import math
 import time
 import uuid
 from typing import Dict, List, Optional, Tuple, Union
+from record_validation import validate_run, time_buckets
 from coordinate_utils import Coordinate, coordinates_match, validate_coordinate
 
 SPORT_STATIC_SALT = "2slhe02lsfiwowlcixisla_sls-_slaor"
@@ -242,6 +243,10 @@ class IndoorRunRecordBuilder:
                       latitude: float = 0.0, longitude: float = 0.0,
                       step_buckets: Optional[List[StepBucket]] = None,
                       calorie: int = 0) -> Tuple[str, dict, dict]:
+        validate_run(total_time_sec, total_steps, start_time_ms, stop_time_ms)
+        validate_coordinate(latitude, longitude)
+        if calorie < 0:
+            raise ValueError("calorie cannot be negative")
         complete = (total_time_sec >= self.sel_min_time) and (total_steps >= self.min_steps)
         if complete:
             un_complete_reason = 0
@@ -275,12 +280,15 @@ class IndoorRunRecordBuilder:
 
         if step_buckets is None:
             step_buckets = []
-            num_buckets = max(1, total_time_sec // 10)
-            steps_per_bucket = total_steps // num_buckets
-            for i in range(num_buckets):
-                b_start = start_time_ms + i * 10000
-                b_end = min(stop_time_ms, b_start + 10000)
-                step_buckets.append(StepBucket(steps_per_bucket, b_start, b_end, queue_num=i + 1))
+            for i, (begin, end, steps, _) in enumerate(time_buckets(
+                    total_time_sec, total_steps, start_time_ms, stop_time_ms)):
+                step_buckets.append(StepBucket(steps, begin, end, queue_num=i + 1))
+        if (not step_buckets or sum(b.stepsNum for b in step_buckets) != total_steps
+                or step_buckets[0].beginTime != start_time_ms
+                or step_buckets[-1].endTime != stop_time_ms
+                or any(b.endTime <= b.beginTime or b.stepsNum < 0 for b in step_buckets)
+                or any(a.endTime != b.beginTime for a, b in zip(step_buckets, step_buckets[1:]))):
+            raise ValueError("step buckets must cover the run and preserve total steps")
 
         steps_json = json.dumps([b.to_dict() for b in step_buckets], separators=(",", ":"))
 
@@ -357,6 +365,10 @@ class OutdoorRunRecordBuilder:
                      five_points: Optional[List[FivePoint]] = None,
                      calorie: int = 120, avg_power: int = 150,
                      room_id: int = 0) -> Tuple[str, dict, dict]:
+        validate_run(total_time_sec, total_steps, start_time_ms, stop_time_ms,
+                     total_distance_m)
+        if calorie < 0 or avg_power < 0:
+            raise ValueError("calorie and power cannot be negative")
         if not gps_points:
             raise ValueError("gps_points cannot be empty")
 
@@ -410,16 +422,12 @@ class OutdoorRunRecordBuilder:
         signature = compute_sport_signature(sign_map)
         original_sign = compute_original_sign(sign_map)
 
-        num_buckets = max(1, total_time_sec // 10)
-        dist_per_bucket = total_distance_m / num_buckets
-        steps_per_bucket = total_steps // num_buckets
         speed_buckets = []
         step_buckets = []
-        for i in range(num_buckets):
-            b_start = start_time_ms + i * 10000
-            b_end = min(stop_time_ms, b_start + 10000)
-            speed_buckets.append(SpeedBucket(dist_per_bucket, b_start, b_end, queue_num=i + 1))
-            step_buckets.append(StepBucket(steps_per_bucket, b_start, b_end, queue_num=i + 1))
+        for i, (begin, end, steps, distance) in enumerate(time_buckets(
+                total_time_sec, total_steps, start_time_ms, stop_time_ms, total_distance_m)):
+            speed_buckets.append(SpeedBucket(distance, begin, end, queue_num=i + 1))
+            step_buckets.append(StepBucket(steps, begin, end, queue_num=i + 1))
 
         all_loc_json = json.dumps([p.to_dict() for p in gps_points], separators=(",", ":"))
         five_pt_json = json.dumps([p.to_dict() for p in (five_points or [])], separators=(",", ":"))

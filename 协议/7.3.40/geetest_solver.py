@@ -198,7 +198,6 @@ class GeeTestV4Solver:
                     "headless": True,
                     "args": [
                         "--disable-blink-features=AutomationControlled",
-                        "--no-sandbox",
                         "--disable-infobars"
                     ]
                 }

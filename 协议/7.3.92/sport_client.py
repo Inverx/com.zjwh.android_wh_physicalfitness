@@ -87,7 +87,7 @@ class SportClient792:
     # 4. 跑步提交子系统 (支持 sport_type=1 计分跑 与 sport_type=6 自由跑)
     def execute_run(self,
                     target_distance_m: int = 2150,
-                    target_time_sec: int = 760,
+                    target_time_sec: int = 1200,
                     sport_type: int = 1,
                     progress_callback: Optional[Callable[[str], None]] = None) -> RunningSubmissionResult:
         """
@@ -131,16 +131,16 @@ class SportClient792:
 
 
     def get_cheat_blacklist(self) -> dict:
-        return self.telemetry.get_cheat_blacklist(self)
+        return self.telemetry.get_cheat_blacklist(self.profile)
 
     def get_barrier_free_policy(self) -> dict:
-        return self.telemetry.get_barrier_free_policy(self)
+        return self.telemetry.get_barrier_free_policy(self.profile)
 
     def get_ranks(self, rank_type: int = 1) -> dict:
-        return self.telemetry.get_rank_list(self, rank_type=rank_type)
+        return self.telemetry.get_rank_list(self.profile, rank_type=rank_type)
 
     def get_credit_popup(self) -> dict:
-        return self.telemetry.get_credit_popup(self)
+        return self.telemetry.get_credit_popup(self.profile)
 
 
     def warmup_home(self) -> dict:

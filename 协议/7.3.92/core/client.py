@@ -7,6 +7,7 @@ import urllib.request
 import uuid
 from typing import Dict, Any, Optional, Union
 
+from .security import open_https
 from .config import DEFAULT_DEVICE_CONFIG, load_customer_device
 from .crypto import NetSecClient, compute_token_sign, aes128_cbc_decrypt
 
@@ -93,7 +94,7 @@ class BaseNetSecClient:
 
         req = urllib.request.Request(url, data=req_data, headers=headers, method=method)
         try:
-            with urllib.request.urlopen(req, context=self.ssl_ctx, timeout=timeout) as resp:
+            with open_https(req, context=self.ssl_ctx, timeout=timeout) as resp:
                 raw = resp.read().decode("utf-8")
                 resp_obj = json.loads(raw)
                 if "r" in resp_obj:

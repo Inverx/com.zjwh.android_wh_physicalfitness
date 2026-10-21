@@ -16,6 +16,8 @@ for p in [cur_dir, parent_dir]:
     if p not in sys.path:
         sys.path.insert(0, p)
 
+from core.security import open_https
+from security_utils import redact_text
 try:
     from .config import (
         URL_CHECK_GEE_USE,
@@ -84,7 +86,7 @@ class LoginClient:
 
         # 3. 发送请求
         req = urllib.request.Request(url, data=b_bytes, headers=headers, method="POST")
-        with urllib.request.urlopen(req, context=self.ssl_ctx, timeout=20) as resp:
+        with open_https(req, context=self.ssl_ctx, timeout=20) as resp:
             raw = resp.read().decode("utf-8")
             resp_obj = json.loads(raw)
             if "r" in resp_obj:
@@ -133,7 +135,7 @@ class LoginClient:
         """端到端登录流程 (checkGeeUse -> solve_captcha -> geevalidate -> login)"""
         def log(msg: str):
             if progress_callback:
-                progress_callback(msg)
+                progress_callback(redact_text(msg))
 
         session_uuid = str(uuid.uuid4())
 
@@ -156,7 +158,7 @@ class LoginClient:
 
                 log("[2.1/3] 上报极验凭据至服务端进行会话绑定 (geevalidate)...")
                 val_res = self.gee_validate(gt_res, session_uuid, username)
-                log(f"    -> geevalidate 响应: {val_res}")
+                log(f"    -> geevalidate 状态: {val_res.get('error', -1) if isinstance(val_res, dict) else -1}")
                 if isinstance(val_res, dict) and val_res.get("error") == 10000:
                     val_passed = True
                     log("    -> 二次校验通过 PASS!")
@@ -181,8 +183,11 @@ class LoginClient:
         login_res = self.submit_login(username, password, session_uuid)
 
         if isinstance(login_res, dict) and login_res.get("error") == 10000 and "data" in login_res:
+            if (not isinstance(login_res["data"], dict) or not login_res["data"].get("token")
+                    or int(login_res["data"].get("uid", -1)) <= 0):
+                return LoginResult(success=False, error_code=-1, message="登录响应缺少有效凭据")
             user_prof = UserProfile.from_api_data(login_res["data"])
-            log(f"登录成功: 姓名={user_prof.name} uid={user_prof.uid} unid={user_prof.unid} 学校={user_prof.campus_name}")
+            log("登录成功")
             return LoginResult(
                 success=True,
                 error_code=10000,

@@ -140,7 +140,6 @@ async function solveOnce(captchaId, port) {
       headless: true,
       args: [
         '--disable-blink-features=AutomationControlled',
-        '--no-sandbox',
         '--disable-infobars',
         '--disable-dev-shm-usage',
         '--disable-gpu'

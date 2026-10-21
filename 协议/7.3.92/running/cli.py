@@ -21,8 +21,8 @@ def main():
     parser.add_argument("-u", "--uid", required=True, help="用户 UID")
     parser.add_argument("--unid", help="学校 UNID")
     parser.add_argument("-d", "--distance", type=int, default=2150, help="跑步目标距离 (米)")
-    parser.add_argument("-s", "--seconds", type=int, default=760, help="跑步总耗时 (秒)")
-    parser.add_argument("-m", "--mode", type=int, default=1, choices=[1, 2, 3, 6], help="运动类型: 1计分跑 6自由跑")
+    parser.add_argument("-s", "--seconds", type=int, default=1200, help="跑步总耗时 (秒)")
+    parser.add_argument("-m", "--mode", type=int, default=1, choices=[1, 6], help="运动类型: 1计分跑 6自由跑")
     args = parser.parse_args()
 
     client = RunningClient(uid=args.uid, token=args.token, unid=args.unid)
@@ -35,11 +35,13 @@ def main():
 
     mode_name = "计分跑" if args.mode == 1 else "自由跑"
     if res.success:
-        valid_str = "达标" if res.is_valid else "未达标"
+        valid_str = "达标" if res.is_valid is True else ("未达标" if res.is_valid is False else "待核验")
         print(f"跑步提交: 成功 模式={mode_name} rrid={res.rrid} 里程={res.total_distance}m 耗时={res.total_time}s 状态={valid_str}")
     else:
         print(f"跑步提交: 失败 模式={mode_name} code={res.error_code} 原因={res.message}")
 
+    return 0 if res.success and res.is_valid is True else 1
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

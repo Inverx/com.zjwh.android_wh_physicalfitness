@@ -1,4 +1,5 @@
 import argparse
+import getpass
 import json
 import os
 import sys
@@ -8,7 +9,7 @@ cur_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, cur_dir)
 
 from sport_client import SportClient
-from security_utils import mask_secret, redact_data
+from security_utils import mask_secret, redact_data, redact_text
 
 
 def print_banner():
@@ -36,7 +37,7 @@ def format_login_error(res: dict):
     print()
     print("登录失败")
     code = res.get("error", res.get("code", "未知"))
-    msg = res.get("message", res.get("errorMsg", "未知错误"))
+    msg = redact_text(res.get("message", res.get("errorMsg", "未知错误")))
     print(f"错误码: {code}")
     print(f"原因: {msg}")
     if code in (10003, 10004):
@@ -66,24 +67,24 @@ def main():
         except (KeyboardInterrupt, EOFError):
             print()
             print("操作已取消")
-            return
+            return 1
 
     if not username:
         print("错误: 账号不能为空")
-        return
+        return 1
 
     password = args.password
     if not password:
         try:
-            password = input("登录密码: ").strip()
+            password = getpass.getpass("登录密码: ")
         except (KeyboardInterrupt, EOFError):
             print()
             print("操作已取消")
-            return
+            return 1
 
     if not password:
         print("错误: 密码不能为空")
-        return
+        return 1
 
     proxy = args.proxy
     if proxy:
@@ -92,7 +93,7 @@ def main():
     client = SportClient(proxy=proxy)
 
     def progress_callback(msg: str):
-        print(msg)
+        print(redact_text(msg))
 
     start_time = time.time()
     try:
@@ -102,13 +103,16 @@ def main():
 
         if resp.get("error") == 10000 and "data" in resp and isinstance(resp["data"], dict):
             format_login_success(resp["data"])
+            return 0
         else:
             format_login_error(resp)
+            return 1
 
     except Exception as e:
         print()
-        print(f"登录异常: {e}")
+        print(f"登录异常: {redact_text(e)}")
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

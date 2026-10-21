@@ -13,6 +13,7 @@ for p in [cur_dir, parent_dir]:
     if p not in sys.path:
         sys.path.insert(0, p)
 
+from core.security import open_https
 from core.client import BaseNetSecClient
 from profile.client import ProfileClient
 from policy.client import PolicyClient
@@ -26,6 +27,7 @@ from .config import (
 )
 from .models import RunningSubmissionResult
 from .builder import RunningTrackBuilder
+from record_validation import validate_run, validate_coordinate
 
 
 class RunningClient(BaseNetSecClient):
@@ -73,7 +75,7 @@ class RunningClient(BaseNetSecClient):
         headers = dict(signed_headers or {"Content-Type": "text/plain"})
         req = urllib.request.Request(signed_url, data=data_bytes, headers=headers, method="PUT")
         try:
-            with urllib.request.urlopen(req, context=self.ssl_ctx, timeout=30) as resp:
+            with open_https(req, context=self.ssl_ctx, timeout=30) as resp:
                 if 200 <= resp.status < 300:
                     return {"error": 10000, "message": "OBS 上传成功"}
                 return {"error": resp.status, "message": f"OBS HTTP {resp.status}"}
@@ -92,7 +94,7 @@ class RunningClient(BaseNetSecClient):
 
     def execute_full_run(self,
                          target_distance_m: int = 2100,
-                         target_time_sec: int = 780,
+                         target_time_sec: int = 1200,
                          sport_type: int = 1,
                          progress_callback: Optional[Callable[[str], None]] = None) -> RunningSubmissionResult:
         """按照 7.3.92 实机抓包全时序规范执行拟人跑步结算全流程"""
@@ -103,8 +105,17 @@ class RunningClient(BaseNetSecClient):
         if not self.uid or not self.token:
             return RunningSubmissionResult(success=False, message="缺少鉴权凭据 (uid/token)")
 
+        try:
+            validate_run(target_time_sec, 0, 0, target_time_sec * 1000, target_distance_m)
+            if sport_type not in (1, 6) or int(self.uid) <= 0 or int(self.unid or 0) <= 0:
+                raise ValueError("需要有效的用户、学校和运动类型")
+        except (TypeError, ValueError) as exc:
+            return RunningSubmissionResult(success=False, message=str(exc))
+
         # 1. 冷启动时间校准与行为埋点
         st1 = self.profile.get_server_time()
+        if not st1.synchronized:
+            return RunningSubmissionResult(success=False, message=st1.error_message)
         t_now_ms = st1.server_timestamp_ms
         log(f"时钟校准: 成功 时间戳={t_now_ms} 偏斜={st1.offset_seconds:+.3f}s")
         if self.unid:
@@ -112,10 +123,19 @@ class RunningClient(BaseNetSecClient):
             self.telemetry.send_page_exposure(unid=int(self.unid))
 
         # 2. 拉取电子围栏与打卡点
+        rule = self.policy.get_run_policy(run_mode=sport_type)
+        if not rule or rule.min_distance <= 0:
+            return RunningSubmissionResult(success=False, message="未取得有效跑步规则，停止提交")
+        # The existing protocol uses a local 1200-second minimum. Do not silently
+        # lower it to the caller's requested duration or claim it is a school rule.
+        if target_distance_m < rule.min_distance or target_time_sec < 1200:
+            return RunningSubmissionResult(success=False, message="距离低于学校规则或时长低于本地1200秒下限")
+        if rule.face_check.enable:
+            return RunningSubmissionResult(success=False, message="当前流程不支持所需的人脸核验，停止提交")
         fences = self.policy.get_geo_fence()
         checkpoints = []
         center_lat, center_lng = 0.0, 0.0  # 默认通用占位坐标
-        if fences and len(fences) > 0:
+        if fences and fences[0].polygon_points and (sport_type != 1 or fences[0].check_points):
             f = fences[0]
             checkpoints = [{"lat": cp.lat, "lng": cp.lng, "name": cp.name} for cp in f.check_points]
             if f.polygon_points:
@@ -123,7 +143,13 @@ class RunningClient(BaseNetSecClient):
                 center_lng = f.polygon_points[0].lng
             log(f"围栏关联: 成功 名称={f.fence_name} 点数={len(checkpoints)}")
         else:
-            log("围栏关联: 未命中 策略=环形合规兜底")
+            return RunningSubmissionResult(success=False, message="围栏或必经点缺失，停止提交")
+
+        try:
+            for point in f.polygon_points + f.check_points:
+                validate_coordinate(point.lat, point.lng)
+        except (TypeError, ValueError):
+            return RunningSubmissionResult(success=False, message="围栏包含无效坐标，停止提交")
 
         # 3. 拟人运动学轨迹生成
         stop_time_ms = t_now_ms
@@ -148,10 +174,10 @@ class RunningClient(BaseNetSecClient):
             stop_time_ms=stop_time_ms,
             gps_points=gps_pts,
             five_points=five_pts,
-            sel_distance_m=2000,
+            sel_distance_m=rule.min_distance,
             sel_run_time_s=1200
         )
-        log(f"轨迹合成: 成功 距离={target_distance_m}m 耗时={target_time_sec}s 点数={len(gps_pts)} 步数={total_steps} 配速={save_record["speed"]}")
+        log(f"轨迹合成: 成功 距离={target_distance_m}m 耗时={target_time_sec}s 点数={len(gps_pts)} 步数={total_steps} 配速={save_record['speed']}")
 
         # 4. 华为云 OBS 预签名上传
         obs_res = self.request_obs_upload_url(object_key=obj_key)
@@ -161,6 +187,8 @@ class RunningClient(BaseNetSecClient):
             return RunningSubmissionResult(success=False, message=f"申请 OBS 上传凭证失败: {err}", raw=obs_res)
 
         obs_info = obs_res["data"]
+        if not isinstance(obs_info, dict) or not obs_info.get("signedUrl"):
+            return RunningSubmissionResult(success=False, message="OBS凭证响应不完整")
         signed_url = obs_info.get("signedUrl")
         signed_headers = obs_info.get("actualSignedRequestHeaders") or {"Content-Type": "text/plain"}
         put_res = self.upload_to_obs(signed_url, signed_headers, obs_payload)
@@ -179,20 +207,32 @@ class RunningClient(BaseNetSecClient):
             return RunningSubmissionResult(success=False, error_code=code, message=msg, raw=sub_res)
 
         data = sub_res.get("data") or {}
-        rrid = data.get("rrid") or data.get("id")
+        rrid = (data.get("rrid") or data.get("id")) if isinstance(data, dict) else None
+        try:
+            if isinstance(rrid, bool) or not isinstance(rrid, (int, str)) or int(rrid) <= 0:
+                raise ValueError("invalid record id")
+            rrid = int(rrid)
+        except (TypeError, ValueError):
+            return RunningSubmissionResult(success=False, message="提交响应缺少有效记录编号，无法核验", raw=sub_res)
         log(f"成绩结算: 成功 rrid={rrid}")
 
         # 6. 跑后实时成绩与状态回查
         time.sleep(0.5)
-        record_detail = self.history.get_one_record(rrid=rrid) if rrid else None
-        is_valid = record_detail.is_valid if record_detail else True
+        try:
+            record_detail = self.history.get_one_record(rrid=rrid)
+        except (TypeError, ValueError, KeyError):
+            record_detail = None
+        if not record_detail or record_detail.rrid != rrid:
+            return RunningSubmissionResult(success=False, rrid=rrid,
+                                           message="提交已受理，成绩尚未核验", raw=sub_res)
+        is_valid = record_detail.is_valid
         
         # 跑后触发详情配置与看盘回刷
         self.get_rundetail_config(sport_type=sport_type)
         if self.unid:
             self.telemetry.send_page_exposure(unid=int(self.unid))
 
-        log(f"判定结果: {"达标" if is_valid else "未达标"}")
+        log(f"判定结果: {'达标' if is_valid else '未达标'}")
         return RunningSubmissionResult(
             success=True,
             rrid=rrid,

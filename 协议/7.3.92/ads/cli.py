@@ -36,6 +36,8 @@ def main():
     else:
         print(f"广告模拟: 失败 位置={args.position} 原因={res.message}")
 
+    return 0 if res.success else 1
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

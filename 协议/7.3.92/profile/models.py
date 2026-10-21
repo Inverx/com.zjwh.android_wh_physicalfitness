@@ -12,6 +12,8 @@ class ServerTime:
     local_timestamp_ms: int
     offset_seconds: float
     server_datetime: str
+    synchronized: bool = True
+    error_message: str = ""
 
     @classmethod
     def from_api(cls, server_ms: int, local_ms: Optional[int] = None) -> "ServerTime":

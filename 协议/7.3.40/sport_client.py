@@ -258,7 +258,8 @@ class SportClient:
             "method": method.upper(),
             "url": url,
             "headers": headers,
-            "timeout": timeout
+            "timeout": timeout,
+            "allow_redirects": False
         }
         if self.proxy:
             req_kwargs["proxies"] = {"http": self.proxy, "https": self.proxy}
@@ -369,6 +370,7 @@ class SportClient:
                 "headers": headers,
                 "data": payload_bytes,
                 "timeout": timeout,
+                "allow_redirects": False,
             }
             if self.proxy:
                 request_kwargs["proxies"] = {"http": self.proxy, "https": self.proxy}
@@ -639,6 +641,8 @@ class SportClient:
                                total_time_sec: int = 1200,
                                total_steps: int = 2000,
                                calorie: int = 150) -> dict:
+        if total_time_sec <= 0 or total_steps < 0 or calorie < 0:
+            raise ValueError("duration must be positive; steps and calorie cannot be negative")
         builder = IndoorRunRecordBuilder(
             uid=int(self.uid or 0),
             unid=self.unid,

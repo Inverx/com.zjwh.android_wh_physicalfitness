@@ -7,6 +7,7 @@ cur_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, cur_dir)
 
 from sport_client import SportClient
+from security_utils import redact_data
 
 
 def main():
@@ -80,6 +81,9 @@ def main():
         except ValueError:
             calorie = 150
 
+    if duration <= 0 or steps < 0 or calorie < 0:
+        parser.error("时长必须为正数，步数和热量不能为负数")
+
     print("\n本次锻炼")
     print(f"时长: {duration} 秒")
     print(f"步数: {steps}")
@@ -99,7 +103,7 @@ def main():
         print("\n提交成功")
     else:
         print("\n提交失败")
-    print(json.dumps(res, ensure_ascii=False, indent=2))
+    print(json.dumps(redact_data(res), ensure_ascii=False, indent=2))
     print()
 
 

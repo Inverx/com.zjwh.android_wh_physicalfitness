@@ -35,10 +35,20 @@ class ProfileClient(BaseNetSecClient):
         t0 = int(time.time() * 1000)
         res = self.execute_request("GET", URL_SERVER_TIME)
         if isinstance(res, dict) and res.get("error") == 10000 and "data" in res:
-            server_ms = int(res["data"])
-            return ServerTime.from_api(server_ms, t0)
-        # 回退
-        return ServerTime.from_api(t0, t0)
+            try:
+                value = res["data"]
+                if isinstance(value, bool) or not isinstance(value, (str, int)):
+                    raise ValueError("invalid server time")
+                server_ms = int(value)
+                if server_ms <= 0:
+                    raise ValueError("invalid server time")
+                return ServerTime.from_api(server_ms, t0)
+            except (TypeError, ValueError, OverflowError, OSError):
+                pass
+        failure = ServerTime.from_api(t0, t0)
+        failure.synchronized = False
+        failure.error_message = "无法获取服务端时间"
+        return failure
 
     def get_user_info(self) -> Optional[UserProfileDetails]:
         """拉取学生核心详细档案"""

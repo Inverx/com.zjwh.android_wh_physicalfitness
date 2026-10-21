@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import random
+import secrets
 import struct
 import time
 import uuid
@@ -102,7 +103,7 @@ class NetSecSession:
         else:
             raw_uuid = str(uuid.uuid4()).replace("-", "")
         printable_pool = [chr(i) for i in range(0x21, 0x7E)]
-        random_suffix = "".join(random.choice(printable_pool) for _ in range(16))
+        random_suffix = "".join(secrets.choice(printable_pool) for _ in range(16))
         candidate_pool = raw_uuid + random_suffix
         pos = 0
         segments = []
@@ -169,7 +170,7 @@ class NetSecCrypto:
         inner_bytes = inner_json.encode("utf-8")
         h = hashlib.md5(inner_bytes).hexdigest().lower()
         printable_pool = [chr(i) for i in range(0x21, 0x7E)]
-        req_aes_key = "".join(random.choice(printable_pool) for _ in range(16)).encode("ascii")
+        req_aes_key = "".join(secrets.choice(printable_pool) for _ in range(16)).encode("ascii")
         zero_iv = bytes(16)
         aes_cipher = AES.new(req_aes_key, AES.MODE_CBC, iv=zero_iv)
         ciphertext = aes_cipher.encrypt(pad(inner_bytes, 16))
@@ -202,10 +203,7 @@ class NetSecCrypto:
         zero_iv = bytes(16)
         aes_cipher = AES.new(session.response_aes_key, AES.MODE_CBC, iv=zero_iv)
         padded_plain = aes_cipher.decrypt(cipher_bytes)
-        try:
-            inner_plain_bytes = unpad(padded_plain, 16)
-        except ValueError:
-            inner_plain_bytes = padded_plain
+        inner_plain_bytes = unpad(padded_plain, 16)
         if verify_sig:
             digest_hex = hashlib.md5(inner_plain_bytes).hexdigest().lower().encode("ascii")
             sig_bytes = base64.b64decode(s_b64)

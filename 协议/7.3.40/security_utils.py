@@ -34,16 +34,25 @@ def redact_data(value: Any) -> Any:
     return value
 
 
+_KEY_PATTERN = (
+    r"token|password|passwd|authorization|imei|device[_-]?id|"
+    r"custom[_-]?device[_-]?id|androidid|wifimac|blmac|account|username|uid"
+)
 _SECRET_TEXT_RE = re.compile(
-    r"(?i)(\b(?:token|password|passwd|authorization|imei|device[_-]?id|"
-    r"custom[_-]?device[_-]?id|account|username|uid)\b\s*[=:]\s*)([^\s,;&]+)"
+    r"(?i)([\"']?\b(?:" + _KEY_PATTERN + r")\b[\"']?\s*[=:]\s*)"
+    r"(\"[^\"]*\"|'[^']*'|[^\s,;&}]+)"
+)
+_AUTH_TEXT_RE = re.compile(
+    r"(?i)([\"']?\bauthorization\b[\"']?\s*[=:]\s*)"
+    r"(?:\"[^\"]*\"|'[^']*'|(?:Basic|Bearer)\s+[^\s,;&}]+)"
 )
 
 
 def redact_text(value: Any) -> str:
-    """Redact common ``key=value`` secrets in arbitrary log text."""
+    """Redact credentials in headers, JSON, Python mappings and key=value logs."""
     text = "" if value is None else str(value)
-    return _SECRET_TEXT_RE.sub(lambda match: match.group(1) + mask_secret(match.group(2)), text)
+    text = _AUTH_TEXT_RE.sub(lambda match: match.group(1) + "[REDACTED]", text)
+    return _SECRET_TEXT_RE.sub(lambda match: match.group(1) + "[REDACTED]", text)
 
 
 class RedactingFilter(logging.Filter):

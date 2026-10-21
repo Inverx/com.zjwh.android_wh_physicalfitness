@@ -8,6 +8,8 @@ import time
 import uuid
 from typing import List, Tuple, Dict, Any, Optional, Union
 
+from record_validation import validate_run, time_buckets, validate_coordinate
+
 from .config import SPORT_STATIC_SALT
 from .models import GpsPoint, FivePoint, StepBucket, SpeedBucket
 
@@ -71,6 +73,13 @@ class RunningTrackBuilder:
                                     total_time_sec: int = 760,
                                     start_time_ms: int = 0) -> Tuple[List[GpsPoint], List[FivePoint]]:
         """根据模式 (sportType=1 计分跑 vs sportType=6 自由跑) 生成真实平滑的 GPS 坐标序列"""
+        validate_run(total_time_sec, 0, start_time_ms,
+                     start_time_ms + total_time_sec * 1000, total_distance_m)
+        center_lat, center_lng = validate_coordinate(center_lat, center_lng)
+        if self.sport_type not in (1, 6):
+            raise ValueError("unsupported sport type")
+        if self.sport_type == 1 and not checkpoints:
+            raise ValueError("required checkpoints are unavailable")
         interval_sec = 3
         num_points = max(10, total_time_sec // interval_sec)
         points = []
@@ -83,6 +92,7 @@ class RunningTrackBuilder:
             for idx, cp in enumerate(checkpoints[:5]):
                 c_lat = float(cp.get("lat") or cp.get("latitude") or center_lat)
                 c_lng = float(cp.get("lng") or cp.get("longitude") or center_lng)
+                validate_coordinate(c_lat, c_lng)
                 waypoints.append((c_lat, c_lng))
                 five_points.append(FivePoint(
                     lat=c_lat,
@@ -91,22 +101,6 @@ class RunningTrackBuilder:
                     isPass=True,
                     pointName=str(cp.get("name") or cp.get("pointName") or f"P_{idx+1}"),
                     position=idx + 1
-                ))
-        elif self.sport_type == 1:
-            # 计分跑默认标准操场 5 必经点
-            radius_deg = 0.00135
-            for i in range(5):
-                ang = (2 * math.pi * i) / 5
-                c_lat = center_lat + radius_deg * math.cos(ang)
-                c_lng = center_lng + radius_deg * math.sin(ang)
-                waypoints.append((c_lat, c_lng))
-                five_points.append(FivePoint(
-                    lat=round(c_lat, 6),
-                    lon=round(c_lng, 6),
-                    isFixed=1,
-                    isPass=True,
-                    pointName=f"CheckPoint_{i+1}",
-                    position=i + 1
                 ))
         else:
             # 2. 自由跑 (sportType=6)：无必经打卡点约束 (fivePoints为空)，生成自然公路环线
@@ -157,6 +151,22 @@ class RunningTrackBuilder:
                                 calorie: int = 135,
                                 avg_power: int = 150) -> Tuple[dict, dict, str]:
         """组装完整的 save/record 报文、OBS 上传大对象与相对路径"""
+        validate_run(total_time_sec, total_steps, start_time_ms, stop_time_ms,
+                     total_distance_m)
+        if (not gps_points or sel_distance_m <= 0 or sel_run_time_s <= 0
+                or calorie < 0 or avg_power < 0):
+            raise ValueError("track, positive thresholds and nonnegative energy are required")
+        if gps_points[0].time != start_time_ms or gps_points[-1].time != stop_time_ms:
+            raise ValueError("track timestamps must match the run")
+        for point in gps_points:
+            validate_coordinate(point.lat, point.lon)
+            if (not isinstance(point.time, int) or not math.isfinite(point.speed)
+                    or point.speed < 0 or not math.isfinite(point.accuracy) or point.accuracy < 0):
+                raise ValueError("invalid track timestamp, speed or accuracy")
+        if any(a.time >= b.time for a, b in zip(gps_points, gps_points[1:])):
+            raise ValueError("track timestamps must increase")
+        if self.sport_type == 1 and not five_points:
+            raise ValueError("required checkpoints are unavailable")
         complete = (total_distance_m >= sel_distance_m) and (total_time_sec >= sel_run_time_s)
         un_complete_reason = 0 if complete else 10
         avg_step_freq = round(total_steps * 60.0 / total_time_sec) if total_time_sec > 0 else 165
@@ -200,16 +210,12 @@ class RunningTrackBuilder:
         original_sign = compute_original_sign(sign_map)
 
         # 2. 生成 10 秒步频与速度分桶
-        num_buckets = max(1, total_time_sec // 10)
-        dist_per_bucket = round(total_distance_m / num_buckets, 2)
-        steps_per_bucket = total_steps // num_buckets
         speed_buckets = []
         step_buckets = []
-        for i in range(num_buckets):
-            b_start = start_time_ms + i * 10000
-            b_end = min(stop_time_ms, b_start + 10000)
-            speed_buckets.append(SpeedBucket(dist_per_bucket, b_start, b_end, queueNum=i + 1))
-            step_buckets.append(StepBucket(steps_per_bucket, b_start, b_end, queueNum=i + 1))
+        for i, (begin, end, steps, distance) in enumerate(time_buckets(
+                total_time_sec, total_steps, start_time_ms, stop_time_ms, total_distance_m)):
+            speed_buckets.append(SpeedBucket(distance, begin, end, queueNum=i + 1))
+            step_buckets.append(StepBucket(steps, begin, end, queueNum=i + 1))
 
         all_loc_json = json.dumps([p.to_dict() for p in gps_points], separators=(",", ":"))
         five_pt_json = json.dumps([p.to_dict() for p in five_points], separators=(",", ":")) if five_points else "[]"

@@ -26,11 +26,14 @@ def main():
 
     # 1. 服务端时间同步
     st = client.get_server_time()
+    if not st.synchronized:
+        print(f"时钟同步失败: {st.error_message}")
+        return 1
     print(f"时钟同步: 服务端时间={st.server_datetime} 偏斜={st.offset_seconds:+.3f}s 时间戳={st.server_timestamp_ms}")
 
     if not args.token:
         print("个人档案: 失败 原因=缺少Token")
-        return
+        return 1
 
     # 2. 首页基础信息
     base_info = client.get_home_base_user_info()
@@ -48,4 +51,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

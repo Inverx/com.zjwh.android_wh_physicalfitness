@@ -130,5 +130,5 @@ class RunningSubmissionResult:
     message: str = ""
     total_distance: float = 0.0
     total_time: int = 0
-    is_valid: bool = False
+    is_valid: Optional[bool] = None
     raw: Dict[str, Any] = field(default_factory=dict)
