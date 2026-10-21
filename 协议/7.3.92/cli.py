@@ -56,7 +56,7 @@ def main():
         if not res.success:
             print(f"登录失败: code={res.error_code} 原因={res.message}")
             return 1
-        print(f"登录成功: token=[REDACTED] uid={mask_secret(client.uid)} unid={client.unid}")
+        print(f"登录成功: token={client.token} uid={client.uid} unid={client.unid}")
 
     # 2. 时钟对齐
     if args.sync_time or (not args.rules and not args.profile and not args.history and not args.run and not args.watch_ad):

@@ -46,7 +46,7 @@ def main():
 
     if result.success and result.user:
         u = result.user
-        print(f"登录结果: 成功 姓名={mask_secret(u.name, keep=1)} uid={mask_secret(u.uid)} token=[REDACTED] 耗时={elapsed:.2f}s")
+        print(f"登录结果: 成功 姓名={mask_secret(u.name, keep=1)} uid={u.uid} unid={u.unid} token={u.token} 耗时={elapsed:.2f}s")
         return 0
     else:
         print(f"登录结果: 失败 code={result.error_code} 原因={result.message} 耗时={elapsed:.2f}s")

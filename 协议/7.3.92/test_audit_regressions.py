@@ -237,7 +237,7 @@ class CliTests(OfflineTest):
         proc = subprocess.run([sys.executable, '-B', str(entry), '--run'], capture_output=True, timeout=10)
         self.assertEqual(proc.returncode, 1)
 
-    def test_login_does_not_print_full_token(self):
+    def test_login_prints_reusable_credentials(self):
         spec = importlib.util.spec_from_file_location('audit_main_cli', pathlib.Path(__file__).with_name('cli.py'))
         cli = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cli)
@@ -251,8 +251,23 @@ class CliTests(OfflineTest):
         with patch.object(sys, 'argv', ['cli.py', '-u', 'audit', '-p', 'dummy']), \
                 patch.object(cli, 'SportClient792', return_value=fake), contextlib.redirect_stdout(output):
             self.assertEqual(cli.main(), 0)
-        self.assertNotIn(fake.token, output.getvalue())
-        self.assertIn('[REDACTED]', output.getvalue())
+        self.assertIn('token=' + fake.token, output.getvalue())
+        self.assertIn('uid=' + fake.uid, output.getvalue())
+        self.assertIn('unid=' + fake.unid, output.getvalue())
+
+    def test_standalone_login_prints_reusable_credentials(self):
+        cli = importlib.import_module('login.cli')
+        fake = Mock()
+        user = types.SimpleNamespace(name='audit', uid=123456789, unid=2,
+                                     token='AUDIT_FULL_TOKEN_SECRET')
+        fake.login.return_value = types.SimpleNamespace(success=True, user=user)
+        output = io.StringIO()
+        with patch.object(sys, 'argv', ['login/cli.py', '-u', 'audit', '-p', 'dummy']), \
+                patch.object(cli, 'LoginClient', return_value=fake), contextlib.redirect_stdout(output):
+            self.assertEqual(cli.main(), 0)
+        self.assertIn('token=' + user.token, output.getvalue())
+        self.assertIn('uid=' + str(user.uid), output.getvalue())
+        self.assertIn('unid=' + str(user.unid), output.getvalue())
 
     def test_failed_sync_exit_nonzero(self):
         spec = importlib.util.spec_from_file_location('audit_main_cli', pathlib.Path(__file__).with_name('cli.py'))
