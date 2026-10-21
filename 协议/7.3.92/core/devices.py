@@ -78,9 +78,12 @@ class DeviceStore:
             try:
                 fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
                 break
-            except FileExistsError:
+            except (FileExistsError, PermissionError) as exc:
+                # Windows may report EACCES while another process deletes its lock.
+                if isinstance(exc, PermissionError) and os.name != "nt":
+                    raise
                 if time.monotonic() >= deadline:
-                    raise TimeoutError("Device store is locked; no device was changed")
+                    raise TimeoutError("Device store is locked; no device was changed") from exc
                 time.sleep(0.05)
         try:
             yield

@@ -4,12 +4,14 @@ import importlib
 import importlib.util
 import io
 import json
+import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import socket
 import subprocess
 import sys
 import tempfile
+import time
 import types
 import unittest
 from unittest.mock import Mock, patch
@@ -23,11 +25,22 @@ from sport_client import SportClient792
 class DeviceStoreTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temp.cleanup)
+        self.addCleanup(self.cleanup_temp)
         self.store = DeviceStore(self.temp.name)
         guard = patch.object(socket.socket, 'connect', side_effect=AssertionError('network forbidden'))
         guard.start()
         self.addCleanup(guard.stop)
+
+    def cleanup_temp(self):
+        # A deleted Windows file can briefly remain pending directory removal.
+        for attempt in range(5):
+            try:
+                self.temp.cleanup()
+                return
+            except OSError as exc:
+                if getattr(exc, 'winerror', None) not in (5, 32, 145) or attempt == 4:
+                    raise
+                time.sleep(0.05 * (attempt + 1))
 
     def test_same_account_survives_reopening_and_phone_normalization(self):
         first = self.store.for_account('10000000000')
@@ -111,6 +124,20 @@ class DeviceStoreTests(unittest.TestCase):
         data = json.loads(self.store.path.read_text(encoding='utf-8'))
         self.assertEqual(len(data['accounts']), 9)
         self.assertEqual(len({d['DeviceId'] for d in devices}), 8)
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows lock deletion behavior')
+    def test_windows_transient_lock_permission_error_is_retried(self):
+        original = os.open
+        attempts = []
+        def transient(path, *args, **kwargs):
+            if str(path).endswith('devices.lock') and not attempts:
+                attempts.append(True)
+                raise PermissionError('transient lock deletion')
+            return original(path, *args, **kwargs)
+        with patch('core.devices.os.open', side_effect=transient):
+            device = self.store.for_account('audit-account')
+        self.assertEqual(self.store.for_account('audit-account'), device)
+        self.assertEqual(len(attempts), 1)
 
     def test_profile_survives_a_separate_python_process(self):
         device = self.store.for_account('audit-account')
