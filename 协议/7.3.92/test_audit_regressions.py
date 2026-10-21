@@ -118,7 +118,7 @@ class ValidationTests(OfflineTest):
 
 class ClientTests(OfflineTest):
     def run_client(self):
-        client = RunningClient(uid=1, token='AUDIT_DUMMY', unid=2)
+        client = RunningClient(uid=1, token='AUDIT_DUMMY', unid=2, device_config={'DeviceId': '1' * 32})
         client.profile.get_server_time = Mock(return_value=ServerTime.from_api(1800000000000, 1800000000000))
         rule = types.SimpleNamespace(min_distance=2000, face_check=types.SimpleNamespace(enable=False))
         client.policy.get_run_policy = Mock(return_value=rule)
@@ -213,7 +213,7 @@ class ClientTests(OfflineTest):
             self.assertFalse(client.get_server_time().synchronized)
 
     def test_facade_uses_authenticated_transport(self):
-        client = SportClient792(uid=1, token='AUDIT_DUMMY', unid=2)
+        client = SportClient792(uid=1, token='AUDIT_DUMMY', unid=2, device_config={'DeviceId': '1' * 32})
         client.profile.execute_request = Mock(return_value={'error': 10000})
         for name in ('get_cheat_blacklist', 'get_barrier_free_policy', 'get_ranks', 'get_credit_popup'):
             self.assertEqual(getattr(client, name)(), {'error': 10000})

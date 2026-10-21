@@ -28,6 +28,7 @@ def main():
     parser = argparse.ArgumentParser(description="运动世界校园 7.3.92 纯协议登录终端")
     parser.add_argument("-u", "--username", required=True, help="登录账号 (手机号/学号)")
     parser.add_argument("-p", "--password", required=False, help="登录密码")
+    parser.add_argument("--device-dir", help="设备配置保存目录（默认当前版本的 .device_profiles）")
     args = parser.parse_args()
 
     if args.password is None:
@@ -35,7 +36,7 @@ def main():
     if not args.password:
         parser.error("密码不能为空")
 
-    client = LoginClient()
+    client = LoginClient(device_dir=args.device_dir)
 
     def on_progress(msg: str):
         print(redact_text(msg))

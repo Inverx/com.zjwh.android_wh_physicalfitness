@@ -39,6 +39,7 @@ def main():
     parser.add_argument("--ad-pos", default="4", choices=["1", "2", "4"], help="广告位: 1Banner 2弹窗 4激励视频(默认)")
     parser.add_argument("--ad-duration", type=int, default=15, help="广告观看耗时 (秒，默认 15)")
 
+    parser.add_argument("--device-dir", help="设备配置保存目录（默认当前版本的 .device_profiles）")
     args = parser.parse_args()
     failed = False
     if args.password and not args.username:
@@ -48,7 +49,8 @@ def main():
     if args.username and not args.password:
         parser.error("密码不能为空")
 
-    client = SportClient792(uid=args.uid, token=args.token, unid=args.unid)
+    client = SportClient792(uid=args.uid, token=args.token, unid=args.unid,
+                            account=args.username, device_dir=args.device_dir)
 
     # 1. 登录认证
     if args.username and args.password:

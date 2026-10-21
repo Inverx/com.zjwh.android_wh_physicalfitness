@@ -8,6 +8,7 @@ import uuid
 from typing import Dict, Any, Optional, Union
 
 from .security import open_https
+from .devices import DeviceStore
 from .config import DEFAULT_DEVICE_CONFIG, load_customer_device
 from .crypto import NetSecClient, compute_token_sign, aes128_cbc_decrypt
 
@@ -25,15 +26,22 @@ class BaseNetSecClient:
         self.unid = str(unid) if unid is not None else None
         
         # 初始化设备指纹
-        self.device_config = load_customer_device()
-        if device_config:
+        self._explicit_device = device_config is not None
+        if device_config is not None:
+            self.device_config = load_customer_device()
             self.device_config.update(device_config)
+        elif self.uid:
+            self.device_config = DeviceStore().for_uid(self.uid)
+        else:
+            self.device_config = load_customer_device()
 
         self.crypto = NetSecClient()
         self.ssl_ctx = ssl.create_default_context()
 
     def set_credentials(self, uid: Optional[Union[int, str]], token: Optional[str], unid: Optional[Union[int, str]] = None):
         """动态设置或更新鉴权凭据"""
+        if not self._explicit_device and uid is not None and str(uid) != "-1":
+            self.device_config = DeviceStore().for_uid(uid)
         if uid is not None and str(uid) != "-1":
             self.uid = str(uid)
         if token:

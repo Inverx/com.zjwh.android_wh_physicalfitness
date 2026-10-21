@@ -17,6 +17,7 @@ for p in [cur_dir, parent_dir]:
         sys.path.insert(0, p)
 
 from core.security import open_https
+from core.devices import DeviceStore
 from security_utils import redact_text
 try:
     from .config import (
@@ -50,7 +51,10 @@ class LoginClient:
 
     def __init__(self,
                  device_config: Optional[Dict[str, Any]] = None,
-                 solver: Optional[GeetestV4Solver] = None):
+                 solver: Optional[GeetestV4Solver] = None,
+                 device_dir: Optional[str] = None):
+        self.device_store = DeviceStore(device_dir)
+        self._explicit_device = device_config is not None
         self.device_config = dict(DEFAULT_DEVICE_CONFIG)
         if device_config:
             self.device_config.update(device_config)
@@ -137,6 +141,8 @@ class LoginClient:
             if progress_callback:
                 progress_callback(redact_text(msg))
 
+        if not self._explicit_device:
+            self.device_config.update(self.device_store.for_account(username))
         session_uuid = str(uuid.uuid4())
 
         # 1. checkGeeUse
@@ -187,6 +193,8 @@ class LoginClient:
                     or int(login_res["data"].get("uid", -1)) <= 0):
                 return LoginResult(success=False, error_code=-1, message="登录响应缺少有效凭据")
             user_prof = UserProfile.from_api_data(login_res["data"])
+            if not self._explicit_device:
+                self.device_store.bind_uid(username, user_prof.uid)
             log("登录成功")
             return LoginResult(
                 success=True,

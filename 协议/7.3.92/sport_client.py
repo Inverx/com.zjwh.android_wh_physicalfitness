@@ -7,6 +7,7 @@ if cur_dir not in sys.path:
     sys.path.insert(0, cur_dir)
 
 from core.config import DEFAULT_DEVICE_CONFIG, load_customer_device
+from core.devices import DeviceStore
 from login.client import LoginClient
 from login.models import LoginResult
 from profile.client import ProfileClient
@@ -29,16 +30,30 @@ class SportClient792:
                  uid: Optional[Union[int, str]] = None,
                  token: Optional[str] = None,
                  unid: Optional[Union[int, str]] = None,
-                 device_config: Optional[Dict[str, Any]] = None):
-        self.device_config = load_customer_device()
-        if device_config:
+                 device_config: Optional[Dict[str, Any]] = None,
+                 account: Optional[str] = None,
+                 device_dir: Optional[str] = None):
+        self.device_store = DeviceStore(device_dir)
+        self._explicit_device = device_config is not None
+        self._account = account
+        if self._explicit_device:
+            self.device_config = load_customer_device()
             self.device_config.update(device_config)
+        elif account:
+            self.device_config = self.device_store.for_account(account)
+        elif uid is not None and str(uid) != "-1":
+            self.device_config = self.device_store.for_uid(uid)
+        else:
+            self.device_config = load_customer_device()
 
         self.uid = str(uid) if uid is not None and str(uid) != "-1" else None
         self.token = str(token) if token else None
         self.unid = str(unid) if unid is not None else None
 
-        # 注入各子模块客户端
+        self._initialize_clients()
+
+    def _initialize_clients(self):
+        # Every subclient receives the same saved device configuration.
         self.login_client = LoginClient(device_config=self.device_config)
         self.telemetry = TelemetryClient(device_config=self.device_config)
         self.profile = ProfileClient(uid=self.uid, token=self.token, unid=self.unid, device_config=self.device_config)
@@ -49,6 +64,11 @@ class SportClient792:
 
     def set_credentials(self, uid: Union[int, str], token: str, unid: Optional[Union[int, str]] = None):
         """更新当前客户端上下文中的认证凭据"""
+        if not self._explicit_device:
+            config = self.device_store.for_uid(uid)
+            if config != self.device_config:
+                self.device_config = config
+                self._initialize_clients()
         self.uid = str(uid)
         self.token = str(token)
         if unid is not None:
@@ -62,8 +82,16 @@ class SportClient792:
     # 1. 登录认证子系统
     def login(self, username: str, password: str, progress_callback: Optional[Callable[[str], None]] = None) -> LoginResult:
         """全自动登录 (checkGeeUse -> 极验 v4 无头识别与拟人滑动 -> geevalidate -> login)"""
+        if not self._explicit_device:
+            config = self.device_store.for_account(username)
+            if config != self.device_config:
+                self.device_config = config
+                self._initialize_clients()
+            self._account = username
         res = self.login_client.login(username, password, progress_callback=progress_callback)
         if res.success and res.user:
+            if not self._explicit_device:
+                self.device_store.bind_uid(username, res.user.uid)
             self.set_credentials(uid=res.user.uid, token=res.user.token, unid=res.user.unid)
         return res
 
