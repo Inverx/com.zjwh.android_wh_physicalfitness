@@ -100,11 +100,21 @@ class SportClient792:
         return self.profile.get_server_time()
 
     def get_user_profile(self) -> Optional[UserProfileDetails]:
-        return self.profile.get_user_info()
+        profile = self.profile.get_user_info()
+        if profile and not self.unid:
+            try:
+                if int(profile.uid) == int(self.uid) and int(profile.unid) > 0:
+                    self.set_credentials(self.uid, self.token, profile.unid)
+            except (TypeError, ValueError):
+                pass
+        return profile
 
     # 3. 规则与围栏子系统
     def get_run_policy(self, run_mode: int = 1) -> Optional[RunRule]:
-        return self.policy.get_run_policy(run_mode=run_mode)
+        rule = self.policy.get_run_policy(run_mode=run_mode)
+        if not self.unid and self.policy.unid:
+            self.set_credentials(self.uid, self.token, self.policy.unid)
+        return rule
 
     def get_geo_fences(self) -> list:
         return self.policy.get_geo_fence()

@@ -89,13 +89,14 @@ def main():
             print("跑步规则: 失败 原因=缺少Token或UID")
         else:
             rule = client.get_run_policy(run_mode=args.mode)
-            fences = client.get_geo_fences()
+            fences = client.get_geo_fences() if rule else []
             mode_name = "计分跑" if args.mode == 1 else "自由跑"
             if rule:
                 print(f"跑步规则: 模式={mode_name} 单日上限={rule.day_goal}m 单次最低={rule.min_distance}m 配速={rule.speed_top}~{rule.speed_bottom}分/km 步频={rule.step_top}~{rule.step_bottom}步/分 围栏数={len(fences)}")
             else:
                 failed = True
-                print(f"跑步规则: 失败 模式={mode_name} 原因=规则查询为空")
+                reason = client.policy.last_policy_error or "规则查询为空"
+                print(f"跑步规则: 失败 模式={mode_name} 原因={redact_text(reason)}")
 
     # 5. 广告模拟
     if args.watch_ad:
