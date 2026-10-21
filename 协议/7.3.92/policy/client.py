@@ -34,6 +34,7 @@ class PolicyClient(BaseNetSecClient):
                  device_config: Optional[Dict[str, Any]] = None):
         super().__init__(uid=uid, token=token, unid=unid, device_config=device_config)
         self.last_policy_error: Optional[str] = None
+        self.last_geo_fence_error: Optional[str] = None
 
     def get_run_policy(self, run_mode: int = 1, unid: Optional[Union[int, str]] = None) -> Optional[RunRule]:
         """获取指定运动模式的跑步规则（配速、步频、单次/单日里程、有效时段等）"""
@@ -88,17 +89,32 @@ class PolicyClient(BaseNetSecClient):
 
     def get_geo_fence(self, update_time: int = 0) -> List[GeoFenceArea]:
         """拉取学校电子围栏边界多边形与随机打卡点集"""
-        body = {
-            "geoFenceUpdateTime": update_time
-        }
-        res = self.execute_request("POST", URL_GEO_FENCE, body_plain=body)
-        fences = []
-        if isinstance(res, dict) and res.get("error") == 10000 and "data" in res and res["data"]:
-            d = res["data"]
-            raw_list = d.get("geoFences", []) or []
-            for item in raw_list:
-                fences.append(GeoFenceArea.from_api_data(item))
-        return fences
+        self.last_geo_fence_error = None
+        res = self.execute_request("POST", URL_GEO_FENCE,
+                                   body_plain={"geoFenceUpdateTime": update_time})
+        if not isinstance(res, dict) or res.get("error") != 10000:
+            code = res.get("error", -1) if isinstance(res, dict) else -1
+            message = redact_text(res.get("message", "接口未提供错误说明")) if isinstance(res, dict) else "响应不是 JSON 对象"
+            self.last_geo_fence_error = f"围栏接口 code={code}: {message}"
+            return []
+        try:
+            data = res.get("data")
+            if isinstance(data, str):
+                data = json.loads(data)
+            if not isinstance(data, dict) or not isinstance(data.get("geoFences"), list):
+                self.last_geo_fence_error = "围栏接口 code=10000，但未返回 geoFences 数组"
+                return []
+            if not data["geoFences"]:
+                self.last_geo_fence_error = "围栏接口 code=10000，返回的 geoFences 为空"
+                return []
+            fences = [GeoFenceArea.from_api_data(item) for item in data["geoFences"]]
+            if not any(f.polygon_points for f in fences):
+                self.last_geo_fence_error = "围栏接口返回了围栏，但没有有效边界点"
+            return fences
+        except (TypeError, ValueError, KeyError, AttributeError):
+            self.last_geo_fence_error = "围栏数据格式无法解析；未丢弃错误点后继续提交"
+            return []
+
 
     def get_semester_info(self, run_mode: int = 1) -> Optional[SemesterInfo]:
         """查询学生本学期已完成公里数与剩余目标"""

@@ -129,20 +129,32 @@ class RunningClient(BaseNetSecClient):
         if target_distance_m < rule.min_distance:
             return RunningSubmissionResult(success=False,
                                            message=f"距离低于学校最低里程 {rule.min_distance} 米")
+        school_min_time = getattr(rule, "min_run_time_sec", None)
+        if school_min_time is not None and target_time_sec < school_min_time:
+            return RunningSubmissionResult(success=False,
+                                           message=f"时长低于学校规则 minRunTime={school_min_time} 秒")
         if rule.face_check.enable:
             return RunningSubmissionResult(success=False, message="当前流程不支持所需的人脸核验，停止提交")
         fences = self.policy.get_geo_fence()
         checkpoints = []
-        center_lat, center_lng = 0.0, 0.0  # 默认通用占位坐标
-        if fences and fences[0].polygon_points and (sport_type != 1 or fences[0].check_points):
-            f = fences[0]
+        usable = [f for f in fences if f.polygon_points and (sport_type != 1 or f.check_points)]
+        if usable:
+            f = usable[0]
             checkpoints = [{"lat": cp.lat, "lng": cp.lng, "name": cp.name} for cp in f.check_points]
             if f.polygon_points:
                 center_lat = f.polygon_points[0].lat
                 center_lng = f.polygon_points[0].lng
             log(f"围栏关联: 成功 名称={f.fence_name} 点数={len(checkpoints)}")
         else:
-            return RunningSubmissionResult(success=False, message="围栏或必经点缺失，停止提交")
+            if self.policy.last_geo_fence_error:
+                reason = self.policy.last_geo_fence_error
+            elif any(f.polygon_points for f in fences) and sport_type == 1:
+                point_count = sum(len(f.polygon_points) for f in fences)
+                reason = (f"已取得 {len(fences)} 个围栏、{point_count} 个边界点；"
+                          "但当前计分跑实现需要的必经点 passPoints 未返回，未上传记录")
+            else:
+                reason = "没有取得可用围栏边界，停止提交"
+            return RunningSubmissionResult(success=False, message=reason)
 
         try:
             for point in f.polygon_points + f.check_points:

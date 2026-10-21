@@ -191,6 +191,27 @@ class ClientTests(OfflineTest):
         self.assertIn('2000', result.message)
         client.upload_to_obs.assert_not_called()
 
+    def test_only_explicit_server_minimum_time_is_enforced(self):
+        for duration, permitted in ((299, False), (760, True)):
+            client = self.run_client()
+            client.policy.get_run_policy.return_value.min_run_time_sec = 300
+            result = self.execute(client, target_time_sec=duration)
+            self.assertEqual(result.success, permitted)
+            if not permitted:
+                self.assertIn('minRunTime=300', result.message)
+                client.upload_to_obs.assert_not_called()
+
+    def test_missing_checkpoints_is_distinguished_from_missing_boundary(self):
+        client = self.run_client()
+        fence = client.policy.get_geo_fence.return_value[0]
+        fence.polygon_points = fence.polygon_points * 10
+        fence.check_points = []
+        result = self.execute(client)
+        self.assertFalse(result.success)
+        self.assertIn('10', result.message)
+        self.assertIn('passPoints', result.message)
+        client.upload_to_obs.assert_not_called()
+
     def test_required_face_verification_stops_submission(self):
         client = self.run_client()
         client.policy.get_run_policy.return_value.face_check.enable = True

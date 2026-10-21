@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
+import json
 from dataclasses import dataclass, field
+from record_validation import validate_coordinate
 from typing import List, Optional, Dict, Any, Union
 
 
@@ -37,12 +39,17 @@ class RunRule:
     valid_times: List[str]
     face_check: FaceCheckConfig
     raw: Dict[str, Any] = field(default_factory=dict)
+    min_run_time_sec: Optional[int] = None
 
     @classmethod
     def from_api_data(cls, data: Dict[str, Any]) -> "RunRule":
         rule = data.get("runRuleModel", {}) or {}
         face = data.get("runFaceCheckConfigDTO", {}) or {}
-        
+        min_run_time = rule.get("minRunTime")
+        if min_run_time is not None:
+            if isinstance(min_run_time, bool) or not isinstance(min_run_time, int) or min_run_time < 0:
+                raise ValueError("Invalid server minRunTime")
+
         v_times = []
         for vt in rule.get("validTime", []):
             st = vt.get("start", "")
@@ -64,7 +71,8 @@ class RunRule:
             step_bottom=step_bot_text,
             valid_times=v_times,
             face_check=FaceCheckConfig.from_api_data(face),
-            raw=data
+            raw=data,
+            min_run_time_sec=min_run_time
         )
 
 
@@ -88,24 +96,30 @@ class GeoFenceArea:
 
     @classmethod
     def from_api_data(cls, data: Dict[str, Any]) -> "GeoFenceArea":
-        poly = []
-        for p in data.get("points", []):
-            try:
-                poly.append(GeoPoint(lat=float(p.get("lat")), lng=float(p.get("lng"))))
-            except Exception:
-                pass
+        def parse_points(field_name):
+            values = data.get(field_name)
+            if values is None:
+                return []
+            if isinstance(values, str):
+                values = json.loads(values)
+            if not isinstance(values, list):
+                raise ValueError(f"{field_name} must be a list")
+            result = []
+            for index, point in enumerate(values):
+                if not isinstance(point, dict):
+                    raise ValueError(f"{field_name}[{index}] must be an object")
+                try:
+                    # The fence endpoint uses lon; the rule endpoint may use lng.
+                    latitude, longitude = validate_coordinate(
+                        point.get("lat"), point.get("lng", point.get("lon")))
+                except (TypeError, ValueError):
+                    raise ValueError(f"{field_name}[{index}] has invalid coordinates") from None
+                result.append(GeoPoint(lat=latitude, lng=longitude,
+                                       point_id=point.get("id"), name=point.get("name")))
+            return result
 
-        checks = []
-        for cp in data.get("passPoints", []):
-            try:
-                checks.append(GeoPoint(
-                    lat=float(cp.get("lat")),
-                    lng=float(cp.get("lng")),
-                    point_id=cp.get("id"),
-                    name=cp.get("name")
-                ))
-            except Exception:
-                pass
+        poly = parse_points("points")
+        checks = parse_points("passPoints")
 
         return cls(
             fence_id=int(data.get("id", 0)),
