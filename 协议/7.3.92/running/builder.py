@@ -78,8 +78,6 @@ class RunningTrackBuilder:
         center_lat, center_lng = validate_coordinate(center_lat, center_lng)
         if self.sport_type not in (1, 6):
             raise ValueError("unsupported sport type")
-        if self.sport_type == 1 and not checkpoints:
-            raise ValueError("required checkpoints are unavailable")
         interval_sec = 3
         num_points = max(10, total_time_sec // interval_sec)
         points = []
@@ -101,6 +99,23 @@ class RunningTrackBuilder:
                     isPass=True,
                     pointName=str(cp.get("name") or cp.get("pointName") or f"P_{idx+1}"),
                     position=idx + 1
+                ))
+        elif self.sport_type == 1:
+            # 缺少服务端点位时恢复原版圆形五点；这些点是本地生成的。
+            radius_deg = 0.00135
+            for i in range(5):
+                ang = (2 * math.pi * i) / 5
+                c_lat = center_lat + radius_deg * math.cos(ang)
+                c_lng = center_lng + radius_deg * math.sin(ang)
+                validate_coordinate(c_lat, c_lng)
+                waypoints.append((c_lat, c_lng))
+                five_points.append(FivePoint(
+                    lat=round(c_lat, 6),
+                    lon=round(c_lng, 6),
+                    isFixed=1,
+                    isPass=True,
+                    pointName=f"CheckPoint_{i+1}",
+                    position=i + 1
                 ))
         else:
             # 2. 自由跑 (sportType=6)：无必经打卡点约束 (fivePoints为空)，生成自然公路环线

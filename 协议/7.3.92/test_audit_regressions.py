@@ -107,9 +107,13 @@ class ValidationTests(OfflineTest):
         with self.assertRaises(ValueError):
             validate_run(1, 0, 0, 999)
 
-    def test_counted_run_requires_checkpoints(self):
-        with self.assertRaises(ValueError):
-            RunningTrackBuilder(1, 2).generate_track_around_points(30, 120)
+    def test_counted_run_restores_original_circular_five_point_fallback(self):
+        _, fixed = RunningTrackBuilder(1, 2).generate_track_around_points(30, 120)
+        self.assertEqual(len(fixed), 5)
+        for index, point in enumerate(fixed):
+            self.assertEqual(point.pointName, f'CheckPoint_{index + 1}')
+            self.assertAlmostEqual(((point.lat - 30) ** 2 + (point.lon - 120) ** 2) ** .5,
+                                   .00135, places=6)
 
     def test_selected_duration_is_not_interpreted_as_school_minimum(self):
         builder = RunningTrackBuilder(1, 2, sport_type=6)
@@ -201,16 +205,15 @@ class ClientTests(OfflineTest):
                 self.assertIn('minRunTime=300', result.message)
                 client.upload_to_obs.assert_not_called()
 
-    def test_missing_checkpoints_is_distinguished_from_missing_boundary(self):
+    def test_missing_checkpoints_uses_fallback_and_logs_source(self):
         client = self.run_client()
         fence = client.policy.get_geo_fence.return_value[0]
-        fence.polygon_points = fence.polygon_points * 10
         fence.check_points = []
-        result = self.execute(client)
-        self.assertFalse(result.success)
-        self.assertIn('10', result.message)
-        self.assertIn('passPoints', result.message)
-        client.upload_to_obs.assert_not_called()
+        messages = []
+        result = self.execute(client, progress_callback=messages.append)
+        self.assertTrue(result.success)
+        self.assertTrue(any('圆形生成 5 个本地点' in message for message in messages))
+        client.upload_to_obs.assert_called_once()
 
     def test_required_face_verification_stops_submission(self):
         client = self.run_client()

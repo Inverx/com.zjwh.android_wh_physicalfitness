@@ -137,7 +137,9 @@ class RunningClient(BaseNetSecClient):
             return RunningSubmissionResult(success=False, message="当前流程不支持所需的人脸核验，停止提交")
         fences = self.policy.get_geo_fence()
         checkpoints = []
-        usable = [f for f in fences if f.polygon_points and (sport_type != 1 or f.check_points)]
+        usable = [f for f in fences if f.polygon_points]
+        if sport_type == 1:
+            usable.sort(key=lambda fence: bool(fence.check_points), reverse=True)
         if usable:
             f = usable[0]
             checkpoints = [{"lat": cp.lat, "lng": cp.lng, "name": cp.name} for cp in f.check_points]
@@ -145,13 +147,11 @@ class RunningClient(BaseNetSecClient):
                 center_lat = f.polygon_points[0].lat
                 center_lng = f.polygon_points[0].lng
             log(f"围栏关联: 成功 名称={f.fence_name} 点数={len(checkpoints)}")
+            if sport_type == 1 and not checkpoints:
+                log("必经点兜底: passPoints 未返回，按原版围绕首个边界点圆形生成 5 个本地点；非官方点位")
         else:
             if self.policy.last_geo_fence_error:
                 reason = self.policy.last_geo_fence_error
-            elif any(f.polygon_points for f in fences) and sport_type == 1:
-                point_count = sum(len(f.polygon_points) for f in fences)
-                reason = (f"已取得 {len(fences)} 个围栏、{point_count} 个边界点；"
-                          "但当前计分跑实现需要的必经点 passPoints 未返回，未上传记录")
             else:
                 reason = "没有取得可用围栏边界，停止提交"
             return RunningSubmissionResult(success=False, message=reason)
