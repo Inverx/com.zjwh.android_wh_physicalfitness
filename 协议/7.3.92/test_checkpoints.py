@@ -122,11 +122,12 @@ class CheckpointTests(unittest.TestCase):
         builder=RunningTrackBuilder(1,2,1)
         track,fixed=builder.generate_track_around_points(30,120,checkpoints,2150,760,0)
         body,obs,_=builder.build_submission_payload(2150,760,2900,0,760000,track,fixed)
-        serialized=json.loads(body['fivePointJson'])
+        envelope=json.loads(body['fivePointJson'])
+        serialized=json.loads(envelope['fivePointJson'])
         for actual,source in zip(serialized,official_points()):
             for key in ('lat','lon','glat','glon','pointName','isFixed'):
                 self.assertEqual(actual[key],source[key])
-        self.assertEqual(serialized,json.loads(gzip.decompress(base64.b64decode(obs['fixed_point_json']))))
+        self.assertEqual(envelope,json.loads(gzip.decompress(base64.b64decode(obs['fixed_point_json']))))
 
     def test_counted_run_fetches_official_points_and_reuses_uuid(self):
         client=RunningClient(uid=1,token='DUMMY',unid=2,device_config={'DeviceId':'1'*32})
@@ -134,6 +135,8 @@ class CheckpointTests(unittest.TestCase):
             server_timestamp_ms=1700000760000,offset_seconds=0))
         client.telemetry.send_startup_pv=Mock()
         client.telemetry.send_page_exposure=Mock()
+        client.policy.get_run_policy=Mock(return_value=types.SimpleNamespace(
+            min_distance=2000,raw={'runRuleModel':{'minRunTime':300},'policy':1}))
         client.policy.get_geo_fence=Mock(return_value=[self.fence()])
         client.policy.get_checkpoints_for_run=Mock(return_value=[GeoPoint.from_api_data(p) for p in official_points()])
         client.request_obs_upload_url=Mock(return_value={'error':10000,'data':{'signedUrl':'https://obs.invalid/a'}})
@@ -145,8 +148,27 @@ class CheckpointTests(unittest.TestCase):
         body=client.submit_record.call_args.args[0]
         request_uuid=client.policy.get_checkpoints_for_run.call_args.kwargs['uuid_str']
         self.assertEqual(request_uuid,body['uuid'])
-        self.assertEqual(json.loads(body['fivePointJson'])[0]['pointName'],'Campus 0')
         self.assertTrue(any('来源=pointsResModels' in message for message in messages))
+        self.assertEqual(json.loads(json.loads(body['fivePointJson'])['fivePointJson'])[0]['pointName'],'Campus 0')
+        self.assertEqual(body['selRunTime'],300)
+        self.assertTrue(body['complete'])
+        self.assertEqual(body['unCompleteReason'],0)
+        envelope=json.loads(body['fivePointJson'])
+        self.assertFalse(envelope['useZip'])
+        self.assertFalse(envelope['freedomShowFence'])
+        self.assertEqual(envelope['runAreaId'],-1)
+        self.assertEqual(json.loads(envelope['geoFencesJson']),[self.fence().raw])
+
+    def test_missing_school_rule_stops_before_upload(self):
+        client=RunningClient(uid=1,token='DUMMY',unid=2,device_config={'DeviceId':'1'*32})
+        client.policy.get_run_policy=Mock(return_value=None)
+        client.request_obs_upload_url=Mock()
+        client.submit_record=Mock()
+        result=client.execute_full_run(2150,760)
+        self.assertFalse(result.success)
+        client.request_obs_upload_url.assert_not_called()
+        client.submit_record.assert_not_called()
+
 
     def test_query_only_cli_never_submits(self):
         spec=importlib.util.spec_from_file_location('checkpoint_cli',Path(__file__).with_name('cli.py'))

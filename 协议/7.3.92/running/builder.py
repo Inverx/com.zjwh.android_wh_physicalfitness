@@ -147,9 +147,12 @@ class RunningTrackBuilder:
                                 gps_points: List[GpsPoint],
                                 five_points: List[FivePoint],
                                 sel_distance_m: int = 2000,
-                                sel_run_time_s: int = 1200,
+                                sel_run_time_s: int = 0,
                                 calorie: int = 135,
-                                avg_power: int = 150) -> Tuple[dict, dict, str]:
+                                avg_power: int = 150,
+                                run_area_id: int = -1,
+                                geo_fences_json: Optional[str] = None,
+                                policy: int = 1) -> Tuple[dict, dict, str]:
         """组装完整的 save/record 报文、OBS 上传大对象与相对路径"""
         validate_totals(total_time_sec, total_steps, start_time_ms, stop_time_ms, total_distance_m)
         check_track(gps_points, total_distance_m, total_time_sec, start_time_ms, stop_time_ms, five_points)
@@ -192,6 +195,7 @@ class RunningTrackBuilder:
             "validDis": total_distance_m,
             "validTime": total_time_sec
         }
+        sign_map["policy"] = policy
         signature = compute_sport_signature(sign_map)
         original_sign = compute_original_sign(sign_map)
 
@@ -205,6 +209,14 @@ class RunningTrackBuilder:
 
         all_loc_json = json.dumps([p.to_dict() for p in gps_points], separators=(",", ":"))
         five_pt_json = json.dumps([p.to_dict() for p in five_points], separators=(",", ":")) if five_points else "[]"
+        # Android CreditRunPIml serializes PointJsonEntity, not the point array.
+        # The inner fivePointJson remains a JSON string in this envelope.
+        if self.sport_type == 1:
+            envelope = {"useZip": False, "fivePointJson": five_pt_json,
+                        "runAreaId": run_area_id, "freedomShowFence": False}
+            if geo_fences_json is not None:
+                envelope["geoFencesJson"] = geo_fences_json
+            five_pt_json = json.dumps(envelope, separators=(",", ":"))
         speed_json = json.dumps([b.to_dict() for b in speed_buckets], separators=(",", ":"))
         step_json = json.dumps([b.to_dict() for b in step_buckets], separators=(",", ":"))
 
@@ -257,6 +269,8 @@ class RunningTrackBuilder:
             "validDis": total_distance_m,
             "validTime": total_time_sec
         }
+
+        save_record["policy"] = policy
 
         # 4. 组装 OBS Gzip-Base64 载荷
         obs_payload = {

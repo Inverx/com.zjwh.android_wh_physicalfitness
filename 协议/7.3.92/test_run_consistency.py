@@ -120,6 +120,8 @@ class RunConsistencyTests(unittest.TestCase):
             server_timestamp_ms=1700000000000,offset_seconds=0))
         client.telemetry.send_startup_pv=Mock()
         client.telemetry.send_page_exposure=Mock()
+        client.policy.get_run_policy=Mock(return_value=types.SimpleNamespace(
+            min_distance=2000,raw={'runRuleModel':{'minRunTime':300},'policy':1}))
         client.policy.get_geo_fence=Mock(return_value=[])
         client.request_obs_upload_url=Mock()
         client.submit_record=Mock()

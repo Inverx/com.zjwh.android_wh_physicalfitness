@@ -34,6 +34,7 @@ class PolicyClient(BaseNetSecClient):
                  unid: Optional[Union[int, str]] = None,
                  device_config: Optional[Dict[str, Any]] = None):
         super().__init__(uid=uid, token=token, unid=unid, device_config=device_config)
+        self.last_checkpoint_area_id: int = -1
         self.last_checkpoint_error: Optional[str] = None
         self.last_checkpoint_start_time: Optional[int] = None
 
@@ -118,12 +119,15 @@ class PolicyClient(BaseNetSecClient):
         return self.execute_request("POST", url, body_plain=body)
 
     def get_checkpoints_for_run(self, fence: GeoFenceArea,
-                                uuid_str: Optional[str] = None) -> List[GeoPoint]:
+                                uuid_str: Optional[str] = None,
+                                rule: Optional[RunRule] = None) -> List[GeoPoint]:
         """Use the school minimum distance and selected area, as RunStartViewModel does."""
         self.last_checkpoint_error = None
         self.last_checkpoint_start_time = None
+        self.last_checkpoint_area_id = -1
         try:
-            rule = self.get_run_policy(run_mode=1)
+            if rule is None:
+                rule = self.get_run_policy(run_mode=1)
             if rule is None or rule.min_distance <= 0:
                 raise ValueError("未取得有效学校规则，无法确认点位查询距离")
             area_id = -1
@@ -142,6 +146,7 @@ class PolicyClient(BaseNetSecClient):
                 area_id = int(area["id"])
             if not fence.polygon_points:
                 raise ValueError("围栏没有有效锚点")
+            self.last_checkpoint_area_id = area_id
             latitude, longitude = fence.polygon_points[0].gcj_coordinates()
             return self.get_run_checkpoints(
                 rule.min_distance, latitude, longitude, area_id, uuid_str)

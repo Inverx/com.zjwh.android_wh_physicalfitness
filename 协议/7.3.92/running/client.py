@@ -104,6 +104,20 @@ class RunningClient(BaseNetSecClient):
         if not self.uid or not self.token:
             return RunningSubmissionResult(success=False, message="缺少鉴权凭据 (uid/token)")
 
+        # Use the same school policy for point issuance and record construction.
+        rule = self.policy.get_run_policy(run_mode=sport_type)
+        if rule is None:
+            return RunningSubmissionResult(success=False, message="未取得学校规则，停止提交")
+        try:
+            minimum_distance = rule.min_distance
+            minimum_time = int((rule.raw.get("runRuleModel") or {}).get("minRunTime", 0))
+            policy = int(rule.raw.get("policy", 1))
+            if minimum_distance <= 0 or minimum_time < 0:
+                raise ValueError("学校距离或时长规则无效")
+        except (TypeError, ValueError, AttributeError) as exc:
+            return RunningSubmissionResult(success=False, message=f"学校规则无法解析: {exc}")
+        log(f"学校规则: 最低距离={minimum_distance}m 最低时长={minimum_time}s")
+
         # 1. 冷启动时间校准与行为埋点
         st1 = self.profile.get_server_time()
         t_now_ms = st1.server_timestamp_ms
@@ -124,7 +138,7 @@ class RunningClient(BaseNetSecClient):
                 center_lat = f.polygon_points[0].lat
                 center_lng = f.polygon_points[0].lng
             if sport_type == 1 and not checkpoints:
-                live = self.policy.get_checkpoints_for_run(f, uuid_str=run_uuid)
+                live = self.policy.get_checkpoints_for_run(f, uuid_str=run_uuid, rule=rule)
                 if live:
                     checkpoints = [point.as_checkpoint() for point in live]
                     log(f"官方点位: 成功 来源=pointsResModels 点数={len(checkpoints)}")
@@ -159,8 +173,11 @@ class RunningClient(BaseNetSecClient):
                 stop_time_ms=stop_time_ms,
                 gps_points=gps_pts,
                 five_points=five_pts,
-                sel_distance_m=2000,
-                sel_run_time_s=1200
+                sel_distance_m=minimum_distance,
+                sel_run_time_s=minimum_time,
+                policy=policy,
+                run_area_id=self.policy.last_checkpoint_area_id,
+                geo_fences_json=json.dumps([f.raw for f in fences], separators=(",", ":"))
             )
         except (TypeError, ValueError) as exc:
             return RunningSubmissionResult(success=False, message=f"本地一致性校验失败: {exc}")
