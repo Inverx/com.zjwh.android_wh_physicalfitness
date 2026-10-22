@@ -3,11 +3,11 @@ import gzip
 import hashlib
 import json
 import math
-import random
 import time
 import uuid
 from typing import List, Tuple, Dict, Any, Optional, Union
 
+from .consistency import sample_route, check_track, time_buckets, validate_totals, distance
 from .config import SPORT_STATIC_SALT
 from .models import GpsPoint, FivePoint, StepBucket, SpeedBucket
 
@@ -71,8 +71,8 @@ class RunningTrackBuilder:
                                     total_time_sec: int = 760,
                                     start_time_ms: int = 0) -> Tuple[List[GpsPoint], List[FivePoint]]:
         """根据模式 (sportType=1 计分跑 vs sportType=6 自由跑) 生成真实平滑的 GPS 坐标序列"""
-        interval_sec = 3
-        num_points = max(10, total_time_sec // interval_sec)
+        validate_totals(total_time_sec, 0, start_time_ms,
+                        start_time_ms + total_time_sec*1000, total_distance_m)
         points = []
 
         waypoints = []
@@ -81,8 +81,8 @@ class RunningTrackBuilder:
         # 1. 计分跑 (sportType=1)：必须绑定打卡点
         if self.sport_type == 1 and checkpoints and len(checkpoints) > 0:
             for idx, cp in enumerate(checkpoints[:5]):
-                c_lat = float(cp.get("lat") or cp.get("latitude") or center_lat)
-                c_lng = float(cp.get("lng") or cp.get("longitude") or center_lng)
+                c_lat = float(cp.get("lat", cp.get("latitude", center_lat)))
+                c_lng = float(cp.get("lng", cp.get("longitude", center_lng)))
                 waypoints.append((c_lat, c_lng))
                 five_points.append(FivePoint(
                     lat=c_lat,
@@ -118,29 +118,22 @@ class RunningTrackBuilder:
                 waypoints.append((c_lat, c_lng))
             five_points = []
 
-        # 插值生成连续轨迹点，添加拟人化高斯噪声与自然速度波动
-        base_speed = (total_distance_m / total_time_sec) if total_time_sec > 0 else 2.6
-        for i in range(num_points):
-            t_frac = i / max(1, (num_points - 1))
-            pt_time = int(start_time_ms + t_frac * (total_time_sec * 1000))
-            
-            cycle_pos = (t_frac * (len(waypoints) * 2)) % len(waypoints)
-            w_idx1 = int(cycle_pos)
-            w_idx2 = (w_idx1 + 1) % len(waypoints)
-            w_frac = cycle_pos - w_idx1
-            
-            p1 = waypoints[w_idx1]
-            p2 = waypoints[w_idx2]
-            
-            lat_base = p1[0] + (p2[0] - p1[0]) * w_frac
-            lng_base = p1[1] + (p2[1] - p1[1]) * w_frac
-            
-            lat = round(lat_base + (random.random() - 0.5) * 0.00003, 6)
-            lng = round(lng_base + (random.random() - 0.5) * 0.00003, 6)
-            spd = round(max(1.8, min(4.2, base_speed + (random.random() - 0.5) * 0.4)), 2)
-            acc = round(random.uniform(2.5, 4.8), 1)
-            
-            points.append(GpsPoint(lat=lat, lon=lng, time=pt_time, speed=spd, accuracy=acc, isValid=True))
+        # Sample by traveled distance and keep every route corner.
+        # Fixed checkpoint coordinates are never moved to fit the target.
+        if five_points:
+            waypoints = [(point.lat, point.lon) for point in five_points]
+        samples = sample_route(waypoints, total_distance_m, total_time_sec, start_time_ms,
+                               require_all=bool(five_points))
+        for index, (lat, lon, timestamp) in enumerate(samples):
+            if index:
+                previous = samples[index-1]
+                speed = distance(previous[:2], (lat, lon))*1000/(timestamp-previous[2])
+            else:
+                speed = total_distance_m/total_time_sec
+            points.append(GpsPoint(lat=lat, lon=lon, time=timestamp,
+                                   speed=speed, accuracy=3.0, isValid=True))
+        check_track(points, total_distance_m, total_time_sec, start_time_ms,
+                    start_time_ms+total_time_sec*1000, five_points)
 
         return points, five_points
 
@@ -157,6 +150,8 @@ class RunningTrackBuilder:
                                 calorie: int = 135,
                                 avg_power: int = 150) -> Tuple[dict, dict, str]:
         """组装完整的 save/record 报文、OBS 上传大对象与相对路径"""
+        validate_totals(total_time_sec, total_steps, start_time_ms, stop_time_ms, total_distance_m)
+        check_track(gps_points, total_distance_m, total_time_sec, start_time_ms, stop_time_ms, five_points)
         complete = (total_distance_m >= sel_distance_m) and (total_time_sec >= sel_run_time_s)
         un_complete_reason = 0 if complete else 10
         avg_step_freq = round(total_steps * 60.0 / total_time_sec) if total_time_sec > 0 else 165
@@ -200,16 +195,12 @@ class RunningTrackBuilder:
         original_sign = compute_original_sign(sign_map)
 
         # 2. 生成 10 秒步频与速度分桶
-        num_buckets = max(1, total_time_sec // 10)
-        dist_per_bucket = round(total_distance_m / num_buckets, 2)
-        steps_per_bucket = total_steps // num_buckets
         speed_buckets = []
         step_buckets = []
-        for i in range(num_buckets):
-            b_start = start_time_ms + i * 10000
-            b_end = min(stop_time_ms, b_start + 10000)
-            speed_buckets.append(SpeedBucket(dist_per_bucket, b_start, b_end, queueNum=i + 1))
-            step_buckets.append(StepBucket(steps_per_bucket, b_start, b_end, queueNum=i + 1))
+        for i, (begin, end, count, length) in enumerate(time_buckets(
+                total_time_sec, total_steps, start_time_ms, stop_time_ms, total_distance_m)):
+            speed_buckets.append(SpeedBucket(length, begin, end, queueNum=i + 1))
+            step_buckets.append(StepBucket(count, begin, end, queueNum=i + 1))
 
         all_loc_json = json.dumps([p.to_dict() for p in gps_points], separators=(",", ":"))
         five_pt_json = json.dumps([p.to_dict() for p in five_points], separators=(",", ":")) if five_points else "[]"

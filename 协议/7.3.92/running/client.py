@@ -131,26 +131,29 @@ class RunningClient(BaseNetSecClient):
         total_steps = int((target_distance_m / 0.72) * random.uniform(0.96, 1.04))
 
         builder = RunningTrackBuilder(uid=int(self.uid), unid=int(self.unid or 0), sport_type=sport_type)
-        gps_pts, five_pts = builder.generate_track_around_points(
-            center_lat=center_lat,
-            center_lng=center_lng,
-            checkpoints=checkpoints,
-            total_distance_m=target_distance_m,
-            total_time_sec=target_time_sec,
-            start_time_ms=start_time_ms
-        )
+        try:
+            gps_pts, five_pts = builder.generate_track_around_points(
+                center_lat=center_lat,
+                center_lng=center_lng,
+                checkpoints=checkpoints,
+                total_distance_m=target_distance_m,
+                total_time_sec=target_time_sec,
+                start_time_ms=start_time_ms
+            )
 
-        save_record, obs_payload, obj_key = builder.build_submission_payload(
-            total_distance_m=target_distance_m,
-            total_time_sec=target_time_sec,
-            total_steps=total_steps,
-            start_time_ms=start_time_ms,
-            stop_time_ms=stop_time_ms,
-            gps_points=gps_pts,
-            five_points=five_pts,
-            sel_distance_m=2000,
-            sel_run_time_s=1200
-        )
+            save_record, obs_payload, obj_key = builder.build_submission_payload(
+                total_distance_m=target_distance_m,
+                total_time_sec=target_time_sec,
+                total_steps=total_steps,
+                start_time_ms=start_time_ms,
+                stop_time_ms=stop_time_ms,
+                gps_points=gps_pts,
+                five_points=five_pts,
+                sel_distance_m=2000,
+                sel_run_time_s=1200
+            )
+        except (TypeError, ValueError) as exc:
+            return RunningSubmissionResult(success=False, message=f"本地一致性校验失败: {exc}")
         log(f"轨迹合成: 成功 距离={target_distance_m}m 耗时={target_time_sec}s 点数={len(gps_pts)} 步数={total_steps} 配速={save_record["speed"]}")
 
         # 4. 华为云 OBS 预签名上传
