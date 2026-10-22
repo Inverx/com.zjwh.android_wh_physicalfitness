@@ -146,5 +146,9 @@ class SportClient792:
     def warmup_home(self) -> dict:
         return self.profile.warmup_dashboard_session()
 
-    def get_distance_route(self, sport_type: int = 1, distance_m: int = 1000) -> dict:
-        return self.policy.get_distance_route_points(sport_type=sport_type, distance_m=distance_m)
+    def get_distance_route(self, sport_type: int = 1, distance_m: int = 1000,
+                           latitude: Optional[float] = None, longitude: Optional[float] = None,
+                           run_area_id: int = -1) -> dict:
+        return self.policy.get_distance_route_points(
+            sport_type=sport_type, distance_m=distance_m, latitude=latitude,
+            longitude=longitude, run_area_id=run_area_id)

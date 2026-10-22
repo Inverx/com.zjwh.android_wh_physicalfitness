@@ -5,6 +5,7 @@ import sys
 import time
 import urllib.request
 import random
+import uuid
 from typing import Optional, Dict, Any, Union, List, Callable
 
 cur_dir = os.path.dirname(os.path.abspath(__file__))
@@ -113,6 +114,7 @@ class RunningClient(BaseNetSecClient):
 
         # 2. 拉取电子围栏与打卡点
         fences = self.policy.get_geo_fence()
+        run_uuid = str(uuid.uuid4())
         checkpoints = []
         center_lat, center_lng = 0.0, 0.0  # 默认通用占位坐标
         if fences and len(fences) > 0:
@@ -121,6 +123,13 @@ class RunningClient(BaseNetSecClient):
             if f.polygon_points:
                 center_lat = f.polygon_points[0].lat
                 center_lng = f.polygon_points[0].lng
+            if sport_type == 1 and not checkpoints:
+                live = self.policy.get_checkpoints_for_run(f, uuid_str=run_uuid)
+                if live:
+                    checkpoints = [point.as_checkpoint() for point in live]
+                    log(f"官方点位: 成功 来源=pointsResModels 点数={len(checkpoints)}")
+                else:
+                    log(f"官方点位: 失败 原因={self.policy.last_checkpoint_error}；继续使用本地圆形五点兜底")
             log(f"围栏关联: 成功 名称={f.fence_name} 点数={len(checkpoints)}")
         else:
             log("围栏关联: 未命中 策略=环形合规兜底")
@@ -130,7 +139,8 @@ class RunningClient(BaseNetSecClient):
         start_time_ms = stop_time_ms - (target_time_sec * 1000)
         total_steps = int((target_distance_m / 0.72) * random.uniform(0.96, 1.04))
 
-        builder = RunningTrackBuilder(uid=int(self.uid), unid=int(self.unid or 0), sport_type=sport_type)
+        builder = RunningTrackBuilder(uid=int(self.uid), unid=int(self.unid or 0),
+                                      sport_type=sport_type, uuid_str=run_uuid)
         try:
             gps_pts, five_pts = builder.generate_track_around_points(
                 center_lat=center_lat,

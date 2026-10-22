@@ -22,6 +22,7 @@ def main():
     parser.add_argument("--unid", help="已有学校 UNID")
     parser.add_argument("--sync-time", action="store_true", help="执行服务端时间对齐")
     parser.add_argument("--rules", action="store_true", help="查询跑步规则与电子围栏")
+    parser.add_argument("--checkpoints", action="store_true", help="单独查询官方计分跑点位，不上传成绩")
     parser.add_argument("--profile", action="store_true", help="查询学生个人档案")
     parser.add_argument("--history", action="store_true", help="查询最近历史记录与打卡日历")
 
@@ -49,7 +50,7 @@ def main():
         print(f"登录成功: token={client.token} uid={client.uid} unid={client.unid}")
 
     # 2. 时钟对齐
-    if args.sync_time or (not args.rules and not args.profile and not args.history and not args.run and not args.watch_ad):
+    if args.sync_time or (not args.rules and not args.checkpoints and not args.profile and not args.history and not args.run and not args.watch_ad):
         st = client.sync_server_time()
         print(f"时钟同步: 服务端时间={st.server_datetime} 偏斜={st.offset_seconds:+.3f}s")
 
@@ -76,6 +77,21 @@ def main():
                 print(f"跑步规则: 模式={mode_name} 单日上限={rule.day_goal}m 单次最低={rule.min_distance}m 配速={rule.speed_top}~{rule.speed_bottom}分/km 步频={rule.step_top}~{rule.step_bottom}步/分 围栏数={len(fences)}")
             else:
                 print(f"跑步规则: 失败 模式={mode_name} 原因=规则查询为空")
+
+    if args.checkpoints:
+        if not client.token:
+            print("官方点位: 失败 原因=缺少Token")
+        else:
+            fences = client.get_geo_fences()
+            usable = [fence for fence in fences if fence.polygon_points]
+            if not usable:
+                print("官方点位: 失败 原因=未取得有效围栏锚点")
+            else:
+                points = client.policy.get_checkpoints_for_run(usable[0])
+                if points:
+                    print(f"官方点位: 成功 来源=pointsResModels 点数={len(points)}；未上传成绩")
+                else:
+                    print(f"官方点位: 失败 原因={client.policy.last_checkpoint_error}")
 
     # 5. 广告模拟
     if args.watch_ad:

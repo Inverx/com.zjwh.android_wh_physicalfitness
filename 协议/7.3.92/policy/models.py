@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import json
+import math
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any, Union
 
@@ -75,6 +77,33 @@ class GeoPoint:
     lng: float
     point_id: Optional[int] = None
     name: Optional[str] = None
+    raw: Dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_api_data(cls, data):
+        if not isinstance(data, dict):
+            raise ValueError("point must be an object")
+        lat, lon = data.get("lat"), data.get("lng", data.get("lon"))
+        if isinstance(lat, bool) or isinstance(lon, bool):
+            raise ValueError("point coordinates must be numbers")
+        lat, lon = float(lat), float(lon)
+        if not (math.isfinite(lat) and math.isfinite(lon) and -90 <= lat <= 90 and -180 <= lon <= 180):
+            raise ValueError("point coordinates are out of range")
+        return cls(lat=lat, lng=lon, point_id=data.get("id"),
+                   name=data.get("pointName", data.get("name")), raw=dict(data))
+
+    def gcj_coordinates(self):
+        lat = self.raw.get("glat", self.raw.get("gLat"))
+        lon = self.raw.get("glon", self.raw.get("glng", self.raw.get("gLng")))
+        if lat is None or lon is None or lat == -1 or lon == -1:
+            raise ValueError("围栏未返回 GCJ 坐标，无法构造官方点位请求")
+        point = GeoPoint.from_api_data({"lat": lat, "lon": lon})
+        return point.lat, point.lng
+
+    def as_checkpoint(self):
+        values = dict(self.raw)
+        values.update({"lat": self.lat, "lng": self.lng, "name": self.name})
+        return values
 
 
 @dataclass
@@ -88,24 +117,17 @@ class GeoFenceArea:
 
     @classmethod
     def from_api_data(cls, data: Dict[str, Any]) -> "GeoFenceArea":
-        poly = []
-        for p in data.get("points", []):
-            try:
-                poly.append(GeoPoint(lat=float(p.get("lat")), lng=float(p.get("lng"))))
-            except Exception:
-                pass
+        def parse(field_name):
+            values = data.get(field_name) or []
+            if isinstance(values, str):
+                values = json.loads(values)
+            if not isinstance(values, list):
+                raise ValueError(f"{field_name} must be a list")
+            return [GeoPoint.from_api_data(point) for point in values]
 
-        checks = []
-        for cp in data.get("passPoints", []):
-            try:
-                checks.append(GeoPoint(
-                    lat=float(cp.get("lat")),
-                    lng=float(cp.get("lng")),
-                    point_id=cp.get("id"),
-                    name=cp.get("name")
-                ))
-            except Exception:
-                pass
+        poly = parse("points")
+        # Legacy compatibility only: live checkpoints come from pointsResModels.
+        checks = parse("passPoints")
 
         return cls(
             fence_id=int(data.get("id", 0)),

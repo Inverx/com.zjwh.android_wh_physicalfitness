@@ -87,10 +87,11 @@ class RunningTrackBuilder:
                 five_points.append(FivePoint(
                     lat=c_lat,
                     lon=c_lng,
-                    isFixed=1,
+                    isFixed=cp.get("isFixed", 1),
                     isPass=True,
                     pointName=str(cp.get("name") or cp.get("pointName") or f"P_{idx+1}"),
-                    position=idx + 1
+                    position=cp.get("position", idx + 1),
+                    raw={key: cp[key] for key in ("id", "flag", "state", "glat", "glon", "glng") if key in cp}
                 ))
         elif self.sport_type == 1:
             # 计分跑默认标准操场 5 必经点
