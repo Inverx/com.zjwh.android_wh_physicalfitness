@@ -5,6 +5,7 @@ import sys
 import time
 import urllib.request
 import random
+import uuid
 from typing import Optional, Dict, Any, Union, List, Callable
 
 cur_dir = os.path.dirname(os.path.abspath(__file__))
@@ -103,6 +104,20 @@ class RunningClient(BaseNetSecClient):
         if not self.uid or not self.token:
             return RunningSubmissionResult(success=False, message="缺少鉴权凭据 (uid/token)")
 
+        # Use the same school policy for point issuance and record construction.
+        rule = self.policy.get_run_policy(run_mode=sport_type)
+        if rule is None:
+            return RunningSubmissionResult(success=False, message="未取得学校规则，停止提交")
+        try:
+            minimum_distance = rule.min_distance
+            minimum_time = int((rule.raw.get("runRuleModel") or {}).get("minRunTime", 0))
+            policy = int(rule.raw.get("policy", 1))
+            if minimum_distance <= 0 or minimum_time < 0:
+                raise ValueError("学校距离或时长规则无效")
+        except (TypeError, ValueError, AttributeError) as exc:
+            return RunningSubmissionResult(success=False, message=f"学校规则无法解析: {exc}")
+        log(f"学校规则: 最低距离={minimum_distance}m 最低时长={minimum_time}s")
+
         # 1. 冷启动时间校准与行为埋点
         st1 = self.profile.get_server_time()
         t_now_ms = st1.server_timestamp_ms
@@ -113,6 +128,7 @@ class RunningClient(BaseNetSecClient):
 
         # 2. 拉取电子围栏与打卡点
         fences = self.policy.get_geo_fence()
+        run_uuid = str(uuid.uuid4())
         checkpoints = []
         center_lat, center_lng = 0.0, 0.0  # 默认通用占位坐标
         if fences and len(fences) > 0:
@@ -121,6 +137,13 @@ class RunningClient(BaseNetSecClient):
             if f.polygon_points:
                 center_lat = f.polygon_points[0].lat
                 center_lng = f.polygon_points[0].lng
+            if sport_type == 1 and not checkpoints:
+                live = self.policy.get_checkpoints_for_run(f, uuid_str=run_uuid, rule=rule)
+                if live:
+                    checkpoints = [point.as_checkpoint() for point in live]
+                    log(f"官方点位: 成功 来源=pointsResModels 点数={len(checkpoints)}")
+                else:
+                    log(f"官方点位: 失败 原因={self.policy.last_checkpoint_error}；继续使用本地圆形五点兜底")
             log(f"围栏关联: 成功 名称={f.fence_name} 点数={len(checkpoints)}")
         else:
             log("围栏关联: 未命中 策略=环形合规兜底")
@@ -130,27 +153,34 @@ class RunningClient(BaseNetSecClient):
         start_time_ms = stop_time_ms - (target_time_sec * 1000)
         total_steps = int((target_distance_m / 0.72) * random.uniform(0.96, 1.04))
 
-        builder = RunningTrackBuilder(uid=int(self.uid), unid=int(self.unid or 0), sport_type=sport_type)
-        gps_pts, five_pts = builder.generate_track_around_points(
-            center_lat=center_lat,
-            center_lng=center_lng,
-            checkpoints=checkpoints,
-            total_distance_m=target_distance_m,
-            total_time_sec=target_time_sec,
-            start_time_ms=start_time_ms
-        )
+        builder = RunningTrackBuilder(uid=int(self.uid), unid=int(self.unid or 0),
+                                      sport_type=sport_type, uuid_str=run_uuid)
+        try:
+            gps_pts, five_pts = builder.generate_track_around_points(
+                center_lat=center_lat,
+                center_lng=center_lng,
+                checkpoints=checkpoints,
+                total_distance_m=target_distance_m,
+                total_time_sec=target_time_sec,
+                start_time_ms=start_time_ms
+            )
 
-        save_record, obs_payload, obj_key = builder.build_submission_payload(
-            total_distance_m=target_distance_m,
-            total_time_sec=target_time_sec,
-            total_steps=total_steps,
-            start_time_ms=start_time_ms,
-            stop_time_ms=stop_time_ms,
-            gps_points=gps_pts,
-            five_points=five_pts,
-            sel_distance_m=2000,
-            sel_run_time_s=1200
-        )
+            save_record, obs_payload, obj_key = builder.build_submission_payload(
+                total_distance_m=target_distance_m,
+                total_time_sec=target_time_sec,
+                total_steps=total_steps,
+                start_time_ms=start_time_ms,
+                stop_time_ms=stop_time_ms,
+                gps_points=gps_pts,
+                five_points=five_pts,
+                sel_distance_m=minimum_distance,
+                sel_run_time_s=minimum_time,
+                policy=policy,
+                run_area_id=self.policy.last_checkpoint_area_id,
+                geo_fences_json=json.dumps([f.raw for f in fences], separators=(",", ":"))
+            )
+        except (TypeError, ValueError) as exc:
+            return RunningSubmissionResult(success=False, message=f"本地一致性校验失败: {exc}")
         log(f"轨迹合成: 成功 距离={target_distance_m}m 耗时={target_time_sec}s 点数={len(gps_pts)} 步数={total_steps} 配速={save_record["speed"]}")
 
         # 4. 华为云 OBS 预签名上传

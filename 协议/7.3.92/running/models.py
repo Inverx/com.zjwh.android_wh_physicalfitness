@@ -33,16 +33,19 @@ class FivePoint:
     isPass: bool = True
     pointName: str = ""
     position: int = 0
+    raw: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> dict:
-        return {
+        result = dict(self.raw or {})
+        result.update({
             "lat": self.lat,
             "lon": self.lon,
             "isFixed": self.isFixed,
             "isPass": self.isPass,
             "pointName": self.pointName,
             "position": self.position
-        }
+        })
+        return result
 
 
 @dataclass
