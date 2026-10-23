@@ -45,3 +45,29 @@ class RunRecordDetail:
             avg_step_freq=int(data.get("avgStepFreq", 0)),
             raw=data
         )
+
+def parse_history_records(data):
+    """Accept the current list response and the older recordList envelope."""
+    if isinstance(data, str):
+        import json
+        data = json.loads(data)
+    if data is None:
+        return []
+    if isinstance(data, dict):
+        if "recordList" not in data:
+            raise ValueError("历史响应对象缺少 recordList")
+        data = data["recordList"]
+        if data is None:
+            return []
+    if not isinstance(data, list) or any(not isinstance(row, dict) for row in data):
+        raise ValueError("历史记录应为对象列表")
+    return data
+
+
+def history_record_status(record):
+    """A normal status alone does not establish that the run was completed."""
+    if record.get("complete") is False or record.get("isValid") is False:
+        return "未达标"
+    if record.get("isValid") is True or (record.get("status") == 1 and record.get("complete") is True):
+        return "达标"
+    return f"状态码={record.get('status')}"
