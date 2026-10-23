@@ -775,10 +775,6 @@ LICENSE
   <b>Android Reverse Engineering · Protocol Analysis · Pure Python</b>
 </p>
 
-<p align="center">
-  <a href="https://t.me/Inverx200">Telegram Channel</a>
-  ·
-  <a href="https://t.me/Inverx501">Telegram Group</a>
   ·
   <a href="https://github.com/Inverx/com.zjwh.android_wh_physicalfitness/issues">Issues</a>
 </p>
