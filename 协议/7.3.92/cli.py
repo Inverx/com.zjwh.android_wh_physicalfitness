@@ -11,6 +11,7 @@ if cur_dir not in sys.path:
     sys.path.insert(0, cur_dir)
 
 from sport_client import SportClient792
+from history.models import parse_history_records, history_record_status
 
 
 def main():
@@ -112,11 +113,15 @@ def main():
         else:
             h_res = client.get_history_records(page_num=1, page_size=5)
             if isinstance(h_res, dict) and h_res.get("error") == 10000:
-                recs = h_res.get("data", {}).get("recordList", []) or []
-                print(f"历史记录: 条数={len(recs)}")
-                for r in recs:
-                    status_str = "达标" if r.get("status") == 1 or r.get("isValid") else f"状态码={r.get('status')}"
-                    print(f"记录明细: rrid={r.get('rrid')} 里程={r.get('totalDis')}m 耗时={r.get('totalTime')}s 状态={status_str}")
+                try:
+                    recs = parse_history_records(h_res.get("data"))
+                except (TypeError, ValueError) as exc:
+                    print(f"历史记录: 失败 原因=响应解析失败: {exc}")
+                else:
+                    print(f"历史记录: 条数={len(recs)}")
+                    for r in recs:
+                        status_str = history_record_status(r)
+                        print(f"记录明细: rrid={r.get('rrid')} 里程={r.get('totalDis')}m 耗时={r.get('totalTime')}s 状态={status_str}")
             else:
                 err_msg = h_res.get("message") if isinstance(h_res, dict) else "网络异常"
                 print(f"历史记录: 失败 原因={err_msg}")
