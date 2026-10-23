@@ -96,8 +96,6 @@ Repository: hang666 / JustTrustMePro
 
 - **Telegram 通知频道**：[https://t.me/Inverx200](https://t.me/Inverx200)
 
-- **Telegram 讨论群组**：[https://t.me/Inverx501](https://t.me/Inverx501)
-
 - **GitHub Issues**：[https://github.com/Inverx/com.zjwh.android_wh_physicalfitness/issues](https://github.com/Inverx/com.zjwh.android_wh_physicalfitness/issues)
 
 ---
@@ -131,19 +129,6 @@ https://t.me/Inverx200
 - 协议变化通知
 - 核心组件更新
 - 重要公告
-
-### 讨论群
-
-**Telegram Group：**  
-https://t.me/Inverx501
-
-用于：
-
-- 问题交流
-- Bug 反馈
-- Android 逆向讨论
-- 协议分析交流
-- 密码学与风控机制讨论
 
 也可以直接通过 GitHub Issues 提交可复现的问题。
 
@@ -711,10 +696,6 @@ UID / UNID
 项目更新：
 
 **https://t.me/Inverx200**
-
-技术讨论：
-
-**https://t.me/Inverx501**
 
 如果发现新版本协议变化、兼容性问题或项目 Bug，也可以通过 GitHub Issues 反馈。
 
