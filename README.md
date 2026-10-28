@@ -94,7 +94,6 @@ Repository: hang666 / JustTrustMePro
 
 ## 七、联系方式与反馈渠道
 
-- **Telegram 通知频道**：[https://t.me/Inverx200](https://t.me/Inverx200)
 
 - **GitHub Issues**：[https://github.com/Inverx/com.zjwh.android_wh_physicalfitness/issues](https://github.com/Inverx/com.zjwh.android_wh_physicalfitness/issues)
 
@@ -111,26 +110,6 @@ Repository: hang666 / JustTrustMePro
 </p>
 
 ---
-
-## Telegram
-
-> 项目更新、版本适配及相关通知优先通过 Telegram 发布。
-
-### 通知频道
-
-**Telegram Channel：**  
-https://t.me/Inverx200
-
-用于发布：
-
-- 项目更新
-- 新版本适配
-- Release 发布
-- 协议变化通知
-- 核心组件更新
-- 重要公告
-
-也可以直接通过 GitHub Issues 提交可复现的问题。
 
 ---
 
@@ -688,16 +667,6 @@ UID / UNID
 完整抓包敏感字段
 个人身份信息
 ```
-
----
-
-# Telegram
-
-项目更新：
-
-**https://t.me/Inverx200**
-
-如果发现新版本协议变化、兼容性问题或项目 Bug，也可以通过 GitHub Issues 反馈。
 
 ---
 
