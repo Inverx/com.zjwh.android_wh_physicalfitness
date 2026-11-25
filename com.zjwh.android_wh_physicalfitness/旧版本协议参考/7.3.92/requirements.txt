@@ -1,0 +1,3 @@
+# 运动世界校园 7.3.92 纯协议工具依赖清单
+# Python 核心依赖：标准库（无需额外 pip 包）
+# Node.js 环境依赖：Node 18+ 与 Playwright Chromium 运行时
