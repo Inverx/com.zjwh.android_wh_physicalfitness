@@ -1,3 +1,4 @@
 com.huachenjie.shandong_school/原始脱壳资料/闪动校园/闪动校园8.7.9-FridaDump.zip filter=lfs diff=lfs merge=lfs -text
 com.huachenjie.shandong_school/原始脱壳资料/闪动校园Pro/闪动校园pro2.0.9-FridaDump.zip filter=lfs diff=lfs merge=lfs -text
 com.huachenjie.shandong_school/设备采集-Android-保证协议设备一致/*.apk filter=lfs diff=lfs merge=lfs -text
+*.apk filter=lfs diff=lfs merge=lfs -text
