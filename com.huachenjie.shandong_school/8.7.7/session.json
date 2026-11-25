@@ -1,0 +1,10 @@
+{
+  "token": "YOUR_TOKEN_HERE",
+  "satoken": "YOUR_SATOKEN_HERE",
+  "userId": "YOUR_USER_ID",
+  "schoolCode": "YOUR_SCHOOL_CODE",
+  "userName": "YOUR_NAME",
+  "deviceId": "YOUR_DEVICE_ID",
+  "modelName": "Android|GenericDevice",
+  "systemVersion": "12"
+}
